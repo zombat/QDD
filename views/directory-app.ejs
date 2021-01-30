@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+
+<%- include nav-bar %>
+<link rel="stylesheet" type="text/css" href="/public/css/directory-app.css" />
+
+<div class="row top-10-down">
+	<div class="container-fluid col-lg-10 col-lg-offset-1 col-md-12 bg-white box-shadow">
+		<div class="row bg-primary"><h1>Directory</h1></div>
+		
+		<div class="row">
+			<div class="col-lg-12 col-md-10">
+				<div class="input-group">
+					<input class="btn btn-light form-control SafariFix" rows="1" id="directory-search-box" type="search"></input><button class="btn btn-primary input-group-append" id="directory-search-button">Search</button>
+				</div>
+			</div>
+		</div>
+		<div class="row">
+			<div class="container-fluid col-lg-2 col-md-12 list-area" id="directory-search-results">
+				<!-- Keep empty -->
+			</div>
+			<div class="d-md-block d-lg-none margin-20">
+				
+			</div>
+			<div class="container-fluid col-lg-10 col-md-12 detail-area">
+				<div id="directory-detail-area">
+					<div class="form-group">
+						<label for="directory-first-name-box" >First Name</label> <input class="form-control" rows="1" id="directory-first-name-box"></input>
+						<label for="directory-last-name-box" >Last Name</label> <input class="form-control" rows="1" id="directory-last-name-box"></input>
+						<label for="directory-location-context-box">Location Context</label>
+						<input id="directory-location-context-box" list="directory-location-context-list" type="search" class="form-control input" autocomplete="off">
+					</div>
+				</div>
+				<div class="container-fluid" id="contentMethodsContainer">
+					<div><p class="pull-left"><strong>Contact Methods</strong></p><button class="btn btn-success pull-right" id="directory-add-contact-method-button">+</button></div>
+				</div>
+				<div id="directory-contact-methods">
+					
+				</div>				
+				
+				<div id="directory-modifier-buttons">
+					<button class="btn btn-danger pull-right" id="directory-delete-button">Delete</button>
+					<button class="btn btn-success pull-right" id="directory-save-button">Save</button>
+					<button class="btn btn-info pull-right" id="directory-new-button">New</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<datalist id="directory-location-context-list">
+	<% for(var i=0; i < locationContexts.length; i++) { %>
+		<option value="<%= locationContexts[i] %>"></option>
+	<% } %>
+</datalist>
+<datalist id="directory-contact-method-list">
+	<% for(var i=0; i < contactMethodNames.length; i++) { %>
+		<option value="<%= contactMethodNames[i] %>"></option>
+	<% } %>
+</datalist>
+<script src="/public/js/site/directory-app.js"></script>

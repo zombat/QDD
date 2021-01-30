@@ -1,0 +1,44 @@
+.result-entry {
+	border-bottom: 1px solid #cccccc;
+}
+
+.result-entry:hover {
+	background-color: #cccccc;
+	color: #ffffff;
+}
+
+#directory-detail-area{
+}
+
+#directory-search-box {
+	 /* width: 95%; */
+}
+
+#directory-modifier-buttons .btn {
+	margin: 10px;
+}
+
+#directory-contact-methods-container{
+	border: 1px solid #cccccc;
+	height: 50px;
+	padding: 10px;
+}
+
+
+#directory-contact-methods{
+	min-height: 380px;
+	padding: 10px;
+}
+
+.contact-method{
+	width: 40%;
+}
+
+.contact-method-entry {
+	padding-top: 3px;
+	margin-top: 5px;
+	height: 40px;
+}
+.contact-method-entry input {
+	margin-right: 10px;
+}

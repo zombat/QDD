@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<link rel="stylesheet" type="text/css" href="/public/css/bootstrap/bootstrap.min.css" />
+<link rel="stylesheet" type="text/css" href="/public/css/all.min.css" />
+<link rel="stylesheet" type="text/css" href="/public/css/directoryApp.css" />
+<script src="/public/js/jquery/jquery-3.5.1.min.js"></script>
+<script src="/public/js/all.min.js"></script>
+<script src="/public/js/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="/public/js/site/nav-bar.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<body class="container-fluid">
+<title>QDDA</title>
+<div>
+	<div class="nav-bar bg-primary box-shadow container-fluid">
+		<% if (user) { %>
+		<a href="/logout" class="float-right nav-item" title="Sign Out" id="nav-logout"><i class="fa fa-2x fa-sign-out-alt" aria-hidden="true"></i></a>
+		<a href="/push-notification-app" class="float-right nav-item" title="Push Notification" id="nav-pushNotification"><i class="fas fa-2x fa-exclamation-triangle" aria-hidden="true"></i></a>
+		<a href="/directory-app" class="float-right nav-item" title="Directory" id="nav-directory"><i class="fa fa-2x fa-users" aria-hidden="true"></i></a>
+		<% } else { %>
+		<a href="/login" class="float-right nav-item" title="Sign in" id="nav-login"><i class="fa fa-2x fa-sign-in-alt" aria-hidden="true"></i></a>
+		<% } %>
+	</div>
+<div id="nav-text"></div>

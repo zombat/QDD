@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<script> var locationContextArray =  <%- JSON.stringify(locationContexts) %></script>
+<%- include nav-bar %>
+<link rel="stylesheet" type="text/css" href="/public/css/push-notification-app.css" />
+<div class="row top-10-down">
+	<div class="container-fluid col-lg-10 col-lg-offset-1 col-md-12 bg-white box-shadow">
+		<div class="row bg-primary"><h1>Push Notification Manager</h1></div>
+		
+		<div class="row">
+			<div class="col-lg-12 col-md-10">
+				<div class="input-group">
+					<input class="btn btn-light form-control SafariFix" rows="1" id="push-notification-alert-search-box" type="search"></input><button class="btn btn-primary input-group-append" id="push-notification-alert-search-button">Search</button>
+				</div>
+			</div>
+		</div>
+		<div class="row">
+			<div class="container-fluid col-lg-2 col-md-12 list-area" id="push-notification-alert-template-results">
+				<!-- Keep empty -->
+			</div>
+			<div class="d-md-block d-lg-none margin-20">
+				
+			</div>
+			<div class="container-fluid col-lg-10 col-md-12 detail-area">
+				<div id="push-notification-detail-area">
+					<div class="form-group">
+						<label>Notification Title</label> <input class="form-control" rows="1" id="push-notification-notification-title-box"></input>
+						<label>Notification Text</label> <textarea class="form-control" rows="5" id="push-notification-notification-text-box"></textarea>
+						<div class="dropdown-area margin-10 row">
+							<div class="form-group col-lg-2 col-md-12">
+							  <label for="push-notification-led-color">LED Color</label>
+							  <select class="form-control btn btn-light btn-block" id="push-notification-led-color">
+								<option value="1" label="Red">Red</option>
+								<option value="2" label="Green">Green</option>
+								<option value="3" label="Amber">Amber</option>
+								<option value="4" label="Blue">Blue</option>
+								<option value="5" label="Violet">Violet</option>
+								<option value="6" label="Light Blue">Light Blue</option>
+								<option value="7" label="White">White</option>
+								<option value="8" label="Rotate">Rotate</option>
+							  </select>
+							</div>
+							<div class="form-group col-lg-2 col-md-12">
+							  <label for="push-notification-ring-tone">Ring Type</label>
+							  <select class="form-control btn btn-light btn-block" id="push-notification-ring-tone">
+								<option value="0" label="None">None</option>
+								<option value="1" label="1">1</option>
+								<option value="2" label="2">2</option>
+								<option value="3" label="3">3</option>
+								<option value="4" label="4">4</option>
+								<option value="5" label="5">5</option>
+								<option value="6" label="6">6</option>
+								<option value="7" label="7">7</option>
+								<option value="8" label="8">8</option>
+								<option value="9" label="9">9</option>
+								<option value="10" label="10">10</option>
+								<option value="11" label="11">11</option>
+								<option value="12" label="12">12</option>
+								<option value="13" label="13">13</option>
+								<option value="14" label="14">14</option>
+								<option value="15" label="15">15</option>
+								<option value="16" label="16">16</option>
+								<option value="17" label="17">17</option>
+							  </select>
+							</div>
+							<div class="form-group col-lg-3 col-md-12">
+							  <label for="push-notification-repeat-count">Repeat Count</label>
+							  <select class="form-control btn btn-light btn-block" id="push-notification-repeat-count">
+								<option value="0" label="None">None</option>
+								<option value="1" label="1">1</option>
+								<option value="2" label="2">2</option>
+								<option value="3" label="3">3</option>
+								<option value="4" label="4">4</option>
+								<option value="5" label="5">5</option>
+								<option value="6" label="6">6</option>
+								<option value="7" label="7">7</option>
+								<option value="8" label="8">8</option>
+								<option value="9" label="9">9</option>
+								<option value="10" label="10">10</option>
+								<option value="Until Cancelled" label="Until Cancelled">Until Cancelled</option>
+							  </select>
+							</div>
+							<div class="form-group col-lg-3 col-md-12">
+							  <label for="push-notification-destination-type">Destination Type</label>
+							  <select class="form-control btn btn-light btn-block" id="push-notification-destination-type">
+								<option>Location Context</option>
+								<option>Device Group</option>
+								<!--option>Extension</option-->
+								<option>IP Address</option>
+								<!--option>Subnet</option-->
+							  </select>
+							</div>
+							<div class="form-check col-lg-2 col-md-12">
+							  <input class="form-check-input" type="checkbox" value="" id="push-notification-clear-after" checked>
+							  <label class="form-check-label" for="push-notification-clear-after">Clear After</label>
+							</div>
+					</div>
+					<div class="dropdown-area margin-10 row">
+						<div class="form-group col-12" id="push-notification-destination-device-area">
+							<label for="push-notification-device-group-select">Location Context</label>
+							<select class="form-control btn btn-light btn-block" id="push-notification-device-group-select">
+								<% for(var i=0; i < locationContexts.length; i++) { %>
+									<option><%- locationContexts[i] %></option>									
+								<% } %>
+							</select>
+						</div>
+					</div>
+				</div>	
+				<div class="dropdown-area margin-10 row">
+					<div class="col-12">
+						<button class="btn btn-warning btn-block" id="push-notification-send">Send Push Notification</button>
+					</div>
+				</div>
+				<div id="push-notification-modifier-buttons">
+					<button class="btn btn-danger pull-right" id="push-notification-delete-button">Delete</button>
+					<button class="btn btn-success pull-right" id="push-notification-save-button">Save</button>
+					<button class="btn btn-info pull-right" id="push-notification-new-button">New</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<datalist id="push-notification-location-context-list">
+	
+</datalist>
+
+<script src="/public/js/site/push-notification-app.js"></script>

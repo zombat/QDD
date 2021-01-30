@@ -1,0 +1,45 @@
+{
+  "name": "quick-and-dirty-directory-application",
+  "version": "0.1.4",
+  "description": "NEC Dterm directory application.",
+  "keywords": [
+    "dterm",
+    "directory",
+    "xml",
+    "nec"
+  ],
+  "author": "Raymond Rizzo",
+  "license": "Unlicense",
+  "homepage": "",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "bugs": {
+    "url": ""
+  },
+  "dependencies": {
+    "body-parser": "^1.19.0",
+    "connect-ensure-login": "^0.1.1",
+    "connect-mongo": "^3.2.0",
+    "cookie-parser": "^1.4.5",
+    "dotenv": "^4.0.0",
+    "ejs": "^2.7.4",
+    "express": "^4.17.1",
+    "express-session": "^1.17.1",
+    "get-ip-range": "^3.0.0",
+    "mongodb": "^3.6.3",
+    "mongoose": "^5.11.14",
+    "morgan": "^1.10.0",
+    "passport": "^0.2.2",
+    "passport-local": "^1.0.0",
+    "passport-local-mongoose": "^6.1.0",
+    "request": "^2.88.2",
+    "uuid": "^8.3.2"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "main": "server.js",
+  "devDependencies": {}
+}

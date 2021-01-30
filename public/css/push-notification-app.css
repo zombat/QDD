@@ -1,0 +1,16 @@
+#push-notification-detail-area{
+}
+
+#push-notification-search-box {
+	 /* width: 95%; */
+}
+
+#push-notification-modifier-buttons .btn {
+	margin: 10px;
+}
+
+#contactMethodsContainer{
+	border: 1px solid #cccccc;
+	height: 50px;
+	padding: 10px;
+}
