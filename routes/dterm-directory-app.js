@@ -5,7 +5,8 @@ const	assert = require(`assert`),
 		mongoClient = require(`../mongo-client`),
 		resultLimit = 15,
 		router = express.Router()
-		got = require(`got`);
+		got = require(`got`),
+		necXML = require(`../nec-xml`);
 		
 if(process.env.HTTPS.match(/true/i)){
 	var serverUri = `https://${process.env.SERVER_URI}`;
@@ -26,18 +27,12 @@ router.get(`/:context`, (req, res) => {
 	contextArray.push(`all`);
 	// Log the request.
 	let date = new Date();
-	mongoClient.get().db(process.env.DIRECTORY_DATABASE).collection(process.env.STATISTICS_COLLECTION).insertOne({ timeStamp: date, reqHeaders: req.headers, urlAccessed: `DTerm Directory` }, (err, res) => {
+	mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(process.env.STATISTICS_COLLECTION).insertOne({ timeStamp: date, reqHeaders: req.headers, urlAccessed: `DTerm Directory` }, (err, res) => {
 		assert.equal(null, err);
 		});
 	if(req.query.hasOwnProperty(`support`) && req.query.support.match(/true/i)){
-		let supportInformation = `<DtermIPText title='Support Information'>`;
-			supportInformation += `<Text>Extension Number: ${req.headers['user-agent'].split('/')[7]}\n</Text>`;
-			supportInformation += `<Text>IP Address: ${req._remoteAddress}\n</Text>`;
-			supportInformation += `<Text>Location Contexts: ${contextArray.join(', ')}\n</Text>`;
-			supportInformation += `<SoftKeyItem index='1' name='Back'><URI>SoftKey:Back</URI></SoftKeyItem>`;
-			supportInformation += `</DtermIPText>`;
 		res.writeHead(200, { 'Content-Type': `text/html` });
-		res.end(supportInformation);
+		res.end(necXML.generateTextPage(`Support Information`, `Extension Number: ${req.headers['user-agent'].split('/')[7]}\nIP Address: ${req._remoteAddress}\nLocation Contexts: ${contextArray.join(', ')}\n`, [[`Back`, `SoftKey:Back`]]));
 	} else if(req.query.hasOwnProperty(`browse`) && req.query.browse.match(/true/i) || req.query.hasOwnProperty(`skip`)){
 		// Browse the directory
 		if(!req.query.hasOwnProperty(`skip`) || req.query.skip < 0){
@@ -51,34 +46,29 @@ router.get(`/:context`, (req, res) => {
 			mongoClient.get().db(process.env.DIRECTORY_DATABASE).collection(process.env.DIRECTORY_COLLECTION).find(contextObject).skip(parseInt(req.query.skip)).limit(resultLimit).toArray((err, documents) => {
 				if(documents.length === 0){
 					// No search results.
-					let noMatchScreen = `<DtermIPText title='Search Results'>\n`;
-						noMatchScreen += `<Text>No directory results available.\n\nIf you feel that this is an error, please contact your system administrator.\n\nExtension Number: ${req.headers['user-agent'].split('/')[7]}\nDirectory Location Context: ${contextArray[0]}</Text>\n`;
-						noMatchScreen += `<SoftKeyItem index='1' name='Back'><URI>SoftKey:Back</URI></SoftKeyItem>`;
-						noMatchScreen += `</DtermIPText>`;
 					res.writeHead(200, { 'Content-Type': `text/html` });
-					res.end(noMatchScreen);
-				} else {
-					let directoryList = `<DtermIPList title='Browse' column='1'>\n`;
+					res.end(necXML.generateTextPage(`Search Results`, `No directory results available.\n\nIf you feel that this is an error, please contact your system administrator.\n\nExtension Number: ${req.headers['user-agent'].split('/')[7]}\nDirectory Location Context: ${contextArray[0]}`, [[`Back`, `SoftKey:Back`]]));
+				} else {					
+					let itemArray = [];
 					assert.equal(null, err);			
 						if(parseInt(req.query.skip) > 0){
-							directoryList += `<ListItem name='...Previous Results'><URI>${serverUri}/dtd/${req.params.context}?skip=${req.query.skip - resultLimit}</URI></ListItem>`;
+							itemArray.push([`...Previous Results`,`${serverUri}/dtd/${req.params.context}?skip=${req.query.skip - resultLimit}`]);
 						}
 					documents.forEach((document) =>{
-						directoryList += `<ListItem name='${document.firstName} ${document.lastName}'><URI>${serverUri}/dtd/${req.params.context}?id=${document._id}</URI></ListItem>`;
+						itemArray.push([`${document.firstName} ${document.lastName}`,`${serverUri}/dtd/${req.params.context}?id=${document._id}`]);
 						});
 						if(documentCount > resultLimit){
-							directoryList += `<ListItem name='More Results...'><URI>${serverUri}/dtd/${req.params.context}?skip=${parseInt(req.query.skip) + resultLimit}</URI></ListItem>`;
+							itemArray.push([`More Results...`,`${serverUri}/dtd/${req.params.context}?skip=${parseInt(req.query.skip) + resultLimit}`]);
 						}
-						directoryList += `</DtermIPList>`;
 						res.writeHead(200, { 'Content-Type': `text/html` });
-						res.end(directoryList);
+						res.end(necXML.generateDtermIPList(`Browse`,itemArray,[[`Back`, `SoftKey:Back`]]));
 				}
 			});
 		});
 	} else if(req.query.hasOwnProperty(`search`) && req.query.search.match(/true/i)) {
 		// Display the search screen.
 		res.writeHead(200, { 'Content-Type': `text/html` });
-		res.end(searchDirectoryList(`Search`, req.params.context));
+		res.end(necXML.generateDtermIPInput(`Search Directory`, `${serverUri}/dtd/${req.params.context}`, `Search`, `Text`, `searchString`, `5`, [[`Back`,`SoftKey:Back`],[`Delete`,`SoftKey:BackSpace`]]));
 	} else if(req.query.searchString){
 		var skipCount = 0;
 		// Look, I know it's ugly... It's just that the phone hates having more than one query.
@@ -102,42 +92,35 @@ router.get(`/:context`, (req, res) => {
 				// Check for results.
 				if(documents.length === 0){
 					// No search results.
-					let noMatchScreen = `<DtermIPText title='Search Results'>\n`;
-						noMatchScreen += `<Text>No results found (first or last name) for the search: ${req.query.searchString}\n\nIf you feel that this is an error, please contact your system administrator.\n\nExtension Number: ${req.headers['user-agent'].split('/')[7]}\nDirectory Location Context: ${contextArray[0]}</Text>\n`;
-						noMatchScreen += `<SoftKeyItem index='1' name='Back'><URI>SoftKey:Back</URI></SoftKeyItem>`;
-						noMatchScreen += `</DtermIPText>`;
 					res.writeHead(200, { 'Content-Type': `text/html` });
-					res.end(noMatchScreen);
-				} else {
+					res.end(necXML.generateTextPage(`Search Results`, `No results found (first or last name) for the search: ${req.query.searchString}\n\nIf you feel that this is an error, please contact your system administrator.\n\nExtension Number: ${req.headers['user-agent'].split('/')[7]}\nDirectory Location Context: ${contextArray[0]}`, [[`Back`, `SoftKey:Back`]]));
+				} else {		
 					// Display search results.
-					let searchResultsScreen = `<DtermIPList title='Search Results' column='1'>\n`;
+					let itemArray = [];
 						if(parseInt(skipCount) > 0){
-							searchResultsScreen += `<ListItem name='...Previous Results'><URI>${serverUri}/dtd/${req.params.context}?searchString=${req.query.searchString}:skip=${skipCount - resultLimit}</URI></ListItem>`;
+							itemArray.push([`...Previous Results`,`${serverUri}/dtd/${req.params.context}?searchString=${req.query.searchString}:skip=${skipCount - resultLimit}`]);
 						}
 						Object.keys(documents).forEach((key) =>{
-							searchResultsScreen+= `<ListItem name='${documents[key].firstName} ${documents[key].lastName}'><URI>${serverUri}/dtd/${req.params.context}?id=${documents[key]._id}</URI></ListItem>`;
+							itemArray.push([`${documents[key].firstName} ${documents[key].lastName}`,`${serverUri}/dtd/${req.params.context}?id=${documents[key]._id}`]);
 						});
 						if(documentCount > resultLimit){
-							searchResultsScreen += `<ListItem name='More Results...'><URI>${serverUri}/dtd/${req.params.context}?searchString=${req.query.searchString}:skip=${skipCount + resultLimit}</URI>></ListItem>`;
+							itemArray.push([`More Results...`,`${serverUri}/dtd/${req.params.context}?searchString=${req.query.searchString}:skip=${skipCount + resultLimit}`]);
 						}
-						searchResultsScreen += `</DtermIPList>`;
 					res.writeHead(200, { 'Content-Type': `text/html` });
-					res.end(searchResultsScreen);
+					res.end(necXML.generateDtermIPList(`Search Results`,itemArray,[[`Back`, `SoftKey:Back`]]));
 				}
 			});
 		});
 	} else if(req.query.id){
+		console.log(req.query);
 		if(req.query.index){
 		let objectID = require(`mongodb`).ObjectID(req.query.id.toString());
+		
 		mongoClient.get().db(process.env.DIRECTORY_DATABASE).collection(process.env.DIRECTORY_COLLECTION).find({ _id:  objectID }).toArray((err, document) => {
 			assert.equal(null, err);
 			if(document[0].contactMethods[req.query.index]){
-				let directoryPage = `<DtermIPDirectoryPage title="${document[0].firstName} ${document[0].lastName}" name="${document[0].contactMethods[req.query.index].contactMethodName}">\n`;
-					directoryPage += `<Telephone>${document[0].contactMethods[req.query.index].contactMethodNumber}</Telephone>\n`;
-					directoryPage += `<SoftKeyItem index="1" name="Dial"><URI>SoftKey:Dial</URI></SoftKeyItem>\n`;
-					directoryPage += `</DtermIPDirectoryPage>`;
-					res.writeHead(200, { 'Content-Type': `text/html` });
-					res.end(directoryPage);
+				res.writeHead(200, { 'Content-Type': `text/html` });
+				res.end(necXML.generateDirectoryPage(`${document[0].firstName} ${document[0].lastName}`, document[0].contactMethods[req.query.index].contactMethodName, document[0].contactMethods[req.query.index].contactMethodNumber, [[`Back`,`SoftKey:Back`],[],[],[`Dial`,`SoftKey:Dial`]]));
 				}
 			});
 		} else {
@@ -160,71 +143,9 @@ router.get(`/:context`, (req, res) => {
 		// Just show the main directory menu.
 		updateDtermIpAddress(req, contextArray);
 		res.writeHead(200, { 'Content-Type': `text/html` });
-		let directoryMainMenu = `<DtermIPList title='Corporate Directory' column='1'>\n`;
-		// Browse may result in too many entries.
-		directoryMainMenu += `<ListItem name='Browse Directory'><URI>${serverUri}/dtd/${req.params.context}?browse=true</URI></ListItem>`;
-		directoryMainMenu += `<ListItem name='Search Directory'><URI>${serverUri}/dtd/${req.params.context}?search=true</URI></ListItem>`;
-		directoryMainMenu += `<ListItem name='Support Information'><URI>${serverUri}/dtd/${req.params.context}?support=true</URI></ListItem>`;
-		directoryMainMenu += `</DtermIPList>`;
-		res.end(directoryMainMenu);
+		let directoryMainMenu = `<DtermIPList title='' column='1'>\n`;
+		res.end(necXML.generateDtermIPList(`Corporate Directory`,[[`Browse Directory`,`${serverUri}/dtd/${req.params.context}?browse=true`],[`Search Directory`,`${serverUri}/dtd/${req.params.context}?search=true`],[`Support Information`,`${serverUri}/dtd/${req.params.context}?support=true`]],[[`Back`, `SoftKey:Back`]]));
 	}
-	});
-	
-searchDirectoryList = (searchString, context) =>{
-	if(searchString.match(/search/i)){
-		// Display search screen.
-		let directorySearch = `<DtermIPInput title='Search Directory'><URL>${serverUri}/dtd/${context}</URL><InputItem name='Search' itemtype='Text' key='searchString' default='' inputtype='A' maxlen='5' fieldtype='2'/>`;
-			directorySearch += `<SoftKeyItem index='1' name='Back'><URI>SoftKey:Back</URI></SoftKeyItem>`;
-			directorySearch += `<SoftKeyItem index='2' name='Delete'><URI>SoftKey:BackSpace</URI></SoftKeyItem>`;
-			directorySearch += `</DtermIPInput>`;
-		return directorySearch;
-	} else {
-		if(searchString.id && searchString.contactMethod === `null`){
-			console.log(`Single argument. Getting user contact methods for ID: ${searchString.ID}`);
-			let directoryList = `<DtermIPList title='${corporateDirectory[searchString.ID].Name}' column='1'>`;	
-			if(corporateDirectory[searchString.id].Extension){
-			directoryList += `<ListItem name='Extension'><URI>${serverUri}/directory-app/search/${searchString.ID}/Extension</URI></ListItem>`;
-				}
-			if(corporateDirectory[searchString.id].Cell){
-			directoryList += `<ListItem name='Cell Phone'><URI>${serverUri}/directory-app/search/${searchString.ID}/Cell</URI></ListItem>`;
-				}
-			directoryList += `</DtermIPList>`;
-			return directoryList;
-		} else {
-			let directoryPage = `<DtermIPDirectoryPage title='${searchString.contactMethod}' name='${corporateDirectory[searchString.ID].Name}'><Telephone>${corporateDirectory[searchString.ID][searchString.contactMethod]}</Telephone><Mail>${corporateDirectory[searchString.ID].Mail}</Mail><Note>${corporateDirectory[searchString.ID].Note}</Note><Department></Department><SoftKeyItem index='1' name='Dial'><URI>SoftKey:Dial</URI></SoftKeyItem></DtermIPDirectoryPage>`;
-			return directoryPage;
-			}
-		}
-} 
-
-updateDtermIpAddress = (req, contextArray) => {
-	if(req.headers[`user-agent`].split(`/`)[2] == `JadeDesi`){
-		var hostAddress = req._remoteAddress.split(`ffff:`)[1];
-	} else {
-		var hostAddress = `[${req._remoteAddress}]`;
-	}
-	console.log(hostAddress);
-	got(`http://${hostAddress}/header.cgi`).then(response => {	
-		var document = {
-			extension: req.headers[`user-agent`].split(`/`)[7],
-			ipAddress: req._remoteAddress,
-			macAddress: response.body.match(/\w\w:\w\w:\w\w:\w\w:\w\w:\w\w/)[0],
-			hardwareVersion: response.body.match(/\d.\d.\d.\d/g)[0],
-			firmwareVersion: response.body.match(/\d.\d.\d.\d/g)[1],
-			deviceSeries: deviceInformation[response.body.match(/\d.\d.\d.\d/g)[0]].series,
-			rawHeaders: req.headers,
-			locationContexts: contextArray,
-			lastCheckin: new Date()
-		}
-		if(req.headers[`user-agent`].split(`/`)[2].match(/\((.*)\)/)){
-			document.phoneSubModel = req.headers[`user-agent`].split(`/`)[2].match(/\((.*)\)/)[1];
-		} else {
-			document.phoneSubModel = ``;
-		}
-		db.collection(process.env.PHONE_DATABASE_COLLECTION).updateOne({ _id: document.extension }, { $set:  document } , { upsert: true }, (err, res) => {
-			assert.equal(null, err);
-		});		
-	});
-}
+});
 
 module.exports = router;

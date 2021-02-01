@@ -103,16 +103,17 @@ router.post(`/:notifyfunction`, (req, res) => {
 						}
 							
 						if(req.body.destinationType.match(/location context/i)){
-							mongoClient.get().db(process.env.DIRECTORY_DATABASE).collection(process.env.PHONE_DATABASE_COLLECTION).find({ locationContexts: { $in: req.body.destination } }).toArray((err, documents) => {
+							mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`tracked-device-collection`).find({ locationContexts: { $in: req.body.destination } }).toArray((err, documents) => {
+							console.log(documents);
 								assert.equal(null, err);
 								console.log(`Devices to notify: ${documents.length}`);
 								console.log(`Repeat count: ${repeatCount}`);
 								if(documents.length){
 									let notificationCount = documents.length;
 									for(var i=0;i< documents.length;i++){
-										let hostAddress = `[${documents[i].ipAddress}]`;
-										if(documents[i].deviceSeries.match(/dt820/i)){
-											hostAddress = documents[i].ipAddress.replace(/::ffff:/,``);
+										let hostAddress = `${documents[i].ipAddress}`;
+										if(hostAddress.match(/:/)){
+											hostAddress = `[${hostAddress}]`;
 										}										
 										pushNotify(hostAddress, pushMessage, uuid, repeatCount, req.body.clearAfter);
 									}
