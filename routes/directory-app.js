@@ -12,7 +12,6 @@ router.get(`/js/:fileName`, (req, res) => {
 			//helperFunctions.getUserPermissions(userID, function(response){
 				//if(response!=null){
 					//if(response.betterTac){
-						console.log(req.params.fileName);
 						res.sendFile( `/private/directory-app/js/` + req.params.fileName, { root: `./` });
 					//} 
 				//}
@@ -57,7 +56,6 @@ router.patch(`/UpdateRecord`, (req, res) => {
 	let date = new Date();
 	let updateObject = req.body;
 	updateObject.lastUpdated = date;
-	console.log(req.body._id);
 	if(req.body._id == ``){
 		delete updateObject._id;
 		mongoClient.get().db(process.env.DIRECTORY_DATABASE).collection(process.env.DIRECTORY_COLLECTION).insertOne(updateObject, (err, mongoResponse) => {

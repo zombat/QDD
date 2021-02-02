@@ -17,28 +17,14 @@ const	assert = require(`assert`),
 		MongoStore = require(`connect-mongo`)(session),
 		ensureLoggedIn = require(`connect-ensure-login`).ensureLoggedIn(),
 		unexpectedResponse = `<DtermIPText title='Search Results'>\n<Text>Unexpected response</Text>\n<SoftKeyItem index='1' name='Back'><URI>SoftKey:Back</URI></SoftKeyItem></DtermIPText>`,
-		deviceInformation = {
-		'9.1.3.0' : { version: `5.0.9.0`, firmwareName: `itlisips.tgz`,	series: `DT710`, models: [`SIP_ITL_2E`,`SIP_ITL_6DE`]},
-		'9.1.3.3' : { version: `5.0.9.0`, firmwareName: `itlisipv.tgz`, series: `DT730`, models: [`SIP_ITL_12D`, `SIP_ITL_24D`, `SIP_ITL_32D`,`SIP_ITL_8LD`]},
-		'9.1.3.4' : { version: `5.0.9.0`, firmwareName: `itlisipe.tgz`, series: `DT750`, models: [`SIP_ITL_320C`]},
-		'9.1.5.0' : { version: `1.0.6.0`, firmwareName: `itlisipv.tgz`, series: `DT700G`, models: [`SIP_ITL_12DG`]},
-		'9.1.5.1' : { version: `1.0.6.0`, firmwareName: `itlisipvc.tgz`, series: `DT700G`, models: [`SIP_ITL_2CG`]},
-		'9.1.6.1' : { version: `5.2.3.0`, firmwareName: `itzisipvg.tgz`, series: `DT830`, models: [`SIP_ITZ_12DG`]},
-		'9.1.6.2' : { version: `5.2.3.0`, firmwareName: `itzisipvc.tgz`, series: `DT830`, models: [`SIP_ITZ_12CG`]},
-		'9.1.7.0' : { version: `5.2.6.0`, firmwareName: `ityisipe.tgz`, series: `DT820`, models: [`SIP_ITY_6D`]},
-		'9.1.7.1' : { version: `3.2.6.0`, firmwareName: `ityisipex.tgz`, series: `DT820`, models: [`SIP_ITY_8LDX`]},
-		'9.1.7.2' : { version: `3.2.6.0`, firmwareName: `ityisipec.tgz`	, series: `DT800`, models: [`SIP_ITY_8LCX`]},
-		'9.1.8.0' : { version: `2.3.0.0`, firmwareName: `itkisipe.tgz`, series: `DT900`, models: [`SIP_ITK_6D`,`SIP_ITK_12D`]},
-		'9.1.8.2' : { version: `2.3.0.0`, firmwareName: `itkisipec.tgz`, series: `DT900`, models: [`SIP_ITK_8LCX`]},
-		//'9.1.8.2' : { version: `2.3.0.0`, firmwareName: `itkisipvc.tgz`, series `DT900`, models: [`SIP_ITK_24CG`]},
-		'9.1.8.3' : { version: `2.3.0.0`, firmwareName: `itkisiptc.tgz`, series: `DT900`, models: [`SIP_ITK_TCGX`]}},
 		{ v4: uuidv4 } = require(`uuid`);
 
 // Routes
 const	directoryAppRoute = require(`./routes/directory-app`),
 		dtermDirectoryAppRoute = require(`./routes/dterm-directory-app`),
 		pushNotificationAppRoute = require(`./routes/push-notification-app`),
-		dtermPushNotificationAppRoute = require(`./routes/dterm-push-notification-app`);
+		dtermPushNotificationAppRoute = require(`./routes/dterm-push-notification-app`),
+		dtermTrackingAppRoute= require(`./routes/dterm-tracking-app`);
 
 // MongoDB Connection URI
 if(process.env.MONGO_USER.length && process.env.MONGO_PASSWORD){
@@ -147,22 +133,52 @@ mongoClient.connect(() => {
 	app.use(`/dtd`, dtermDirectoryAppRoute);
 	app.use(`/push-notification-app`, ensureLoggedIn, pushNotificationAppRoute);
 	app.use(`/dtp`, dtermPushNotificationAppRoute);
-	
+	app.use(`/track`, dtermTrackingAppRoute);
 	
 	// Initiate administrator account
 	if(process.argv.indexOf(`--initAdminUser`) >= 0){
 		if(process.argv.length == process.argv.indexOf(`--initAdminUser`)+1){
 			console.log(`--initAdminUser requires a username, password, and password verification.\n\t\tnode server.js --initAdminUser [username] [password] [verifypassword]`);
-			process.exit(2);
+			process.exit(0);
 		} else if(process.argv[process.argv.indexOf(`--initAdminUser`)+2].trim() != process.argv[process.argv.indexOf(`--initAdminUser`)+3].trim()){
 			console.log(`Password must match verification password`);
-			process.exit(2);
+			process.exit(0);
 		} else {
 			accountModel.register(new accountModel({ username: process.argv[process.argv.indexOf(`--initAdminUser`)+1].toLowerCase().trim() }), process.argv[process.argv.indexOf(`--initAdminUser`)+2].trim(), (err, accountCreationResponse) => {
 				assert.equal(null, err);
 				console.log(`Created Administrator Account:\n\tUser Name: ${accountCreationResponse.username}`);
 			});
 		}
+	}
+	if(process.argv.indexOf(`--databaseInit`) >= 0){
+		let deviceInformation = [
+			{ _id: `9.1.3.0`, version: `5.0.9.0`, firmwareName: `itlisips.tgz`, series: `DT710`, models: [`SIP_ITL_2E`,`SIP_ITL_6DE`] },
+			{ _id: `9.1.3.3`, version: `5.0.9.0`, firmwareName: `itlisipv.tgz`, series: `DT730`, models: [`SIP_ITL_12D`, `SIP_ITL_24D`, `SIP_ITL_32D`,`SIP_ITL_8LD`] },
+			{ _id: `9.1.3.4`, version: `5.0.9.0`, firmwareName: `itlisipe.tgz`, series: `DT750`, models: [`SIP_ITL_320C`] },
+			{ _id: `9.1.5.0`, version: `1.0.6.0`, firmwareName: `itlisipv.tgz`, series: `DT700G`, models: [`SIP_ITL_12DG`] },
+			{ _id: `9.1.5.1`, version: `1.0.6.0`, firmwareName: `itlisipvc.tgz`, series: `DT700G`, models: [`SIP_ITL_2CG`] },
+			{ _id: `9.1.6.1`, version: `5.2.3.0`, firmwareName: `itzisipvg.tgz`, series: `DT830`, models: [`SIP_ITZ_12DG`] },
+			{ _id: `9.1.6.2`, version: `5.2.3.0`, firmwareName: `itzisipvc.tgz`, series: `DT830`, models: [`SIP_ITZ_12CG`] },
+			{ _id: `9.1.7.0`, version: `5.2.6.0`, firmwareName: `ityisipe.tgz`, series: `DT820`, models: [`SIP_ITY_6D`] },
+			{ _id: `9.1.7.1`, version: `3.2.6.0`, firmwareName: `ityisipex.tgz`, series: `DT820`, models: [`SIP_ITY_8LDX`] },
+			{ _id: `9.1.7.2`, version: `3.2.6.0`, firmwareName: `ityisipec.tgz`, series: `DT800`, models: [`SIP_ITY_8LCX`] },
+			{ _id: `9.1.8.0`, version: `2.3.0.0`, firmwareName: `itkisipe.tgz`, series: `DT900`, models: [`SIP_ITK_6D`,`SIP_ITK_12D`] },
+			{ _id: `9.1.8.2`, version: `2.3.0.0`, firmwareName: `itkisipec.tgz`, series: `DT900`, models: [`SIP_ITK_8LCX`] },
+			{ _id: `9.1.8.3`, version: `2.3.0.0`, firmwareName: `itkisiptc.tgz`, series: `DT900`, models: [`SIP_ITK_TCGX`] }
+			];
+			mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`nec-devices`).insertMany(deviceInformation, (err, mongoRes) => {
+				assert.equal(null, err);
+				console.log(mongoRes);
+			});
+			
+		let globalVariables = [
+			{ _id: `phone-banner-message`, bannerTitle:`Notice to All Users`, bannerText :`STOP IMMEDIATELY if you do not agree to the conditions stated in this warning. This system is for authorized use only. Users have no explicit or implicit expectation of privacy. Any or all uses of this system and all data on this system may be intercepted, monitored, recorded, copied, audited, inspected, and disclosed to authorized sites and law enforcement personnel, as well as authorized officials of other agencies. By using this system, the user consent to such disclosure at the discretion of authorized site personnel. Unauthorized or improper use of this system may result in administrative disciplinary action, civil and criminal penalties. By continuing to use this system you indicate your awareness of and consent to these terms and conditions of use.`},
+			{_id: `outside-number-prefix`,}
+		];	
+			mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`global-configuration`).insertMany(globalVariables, (err, mongoRes) => {
+				assert.equal(null, err);
+				console.log(mongoRes);
+			});
 	}
 	
 	// ----------------------------------------------------------------------------------------------------------------------  Web Interface Routes

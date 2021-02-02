@@ -53,7 +53,7 @@ router.post(`/:notifyfunction`, (req, res) => {
 		// req.body.notificationTitle: String
 		// req.body.notificationText: String
 		if(req.params.notifyfunction ==`notifyfunction`){
-			console.log(`notify-function`);		
+			//console.log(`notify-function`);		
 				
 			if(req.body.hasOwnProperty(`destinationType`) && req.body.hasOwnProperty(`destination`) && req.body.destination.length && req.body.hasOwnProperty(`notificationTitle`) && req.body.notificationTitle.length && req.body.hasOwnProperty(`notificationText`) && req.body.notificationText.length){
 				if(typeof req.body.destination == `string`){
@@ -103,22 +103,23 @@ router.post(`/:notifyfunction`, (req, res) => {
 						}
 							
 						if(req.body.destinationType.match(/location context/i)){
-							mongoClient.get().db(process.env.DIRECTORY_DATABASE).collection(process.env.PHONE_DATABASE_COLLECTION).find({ locationContexts: { $in: req.body.destination } }).toArray((err, documents) => {
+							mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`tracked-device-collection`).find({ locationContexts: { $in: req.body.destination } }).toArray((err, documents) => {
+							//console.log(documents);
 								assert.equal(null, err);
-								console.log(`Devices to notify: ${documents.length}`);
-								console.log(`Repeat count: ${repeatCount}`);
+								//console.log(`Devices to notify: ${documents.length}`);
+								//console.log(`Repeat count: ${repeatCount}`);
 								if(documents.length){
 									let notificationCount = documents.length;
 									for(var i=0;i< documents.length;i++){
-										let hostAddress = `[${documents[i].ipAddress}]`;
-										if(documents[i].deviceSeries.match(/dt820/i)){
-											hostAddress = documents[i].ipAddress.replace(/::ffff:/,``);
+										let hostAddress = `${documents[i].ipAddress}`;
+										if(hostAddress.match(/:/)){
+											hostAddress = `[${hostAddress}]`;
 										}										
 										pushNotify(hostAddress, pushMessage, uuid, repeatCount, req.body.clearAfter);
 									}
 									res.json({ end: true, sentNotifications: documents.length });
 								} else {
-									console.log(`no docs`);
+									//console.log(`no docs`);
 									res.json({ end: true });
 								}
 							});
@@ -126,12 +127,12 @@ router.post(`/:notifyfunction`, (req, res) => {
 							// Parse IP Addresses and send alerts
 							if(req.body.destination.length > 1){
 								// Comma separated IP list
-								console.log(`Multiple IP addresses found`);
+								//console.log(`Multiple IP addresses found`);
 								for(let i=0; i<req.body.destination.length;i++){
-									console.log(req.body.destination[i]);
+									//console.log(req.body.destination[i]);
 									if(req.body.destination[i].match(/-/g)){
 										if(require(`net`).isIP(req.body.destination[i].split(`-`)[0]) && require(`net`).isIP(req.body.destination[i].split(`-`)[1])){
-											console.log(`Nested IP range found`);
+											//console.log(`Nested IP range found`);
 											ipRange.getIPRange(req.body.destination[i]).forEach((hostAddress) => {
 												pushNotify(hostAddress, pushMessage, uuid, repeatCount, req.body.clearAfter);
 											});
@@ -139,14 +140,14 @@ router.post(`/:notifyfunction`, (req, res) => {
 									} else if(req.body.destination[i].match(`/`)){ 
 										if(parseInt(req.body.destination[i].split(`/`)[1]) > 0 && parseInt(req.body.destination[i].split(`/`)[1]) < 32){
 											if(require(`net`).isIP(req.body.destination[i].split(`/`)[0])){
-												console.log(`Nested CIDR found`);
+												//console.log(`Nested CIDR found`);
 												ipRange.getIPRange(req.body.destination[i]).forEach((hostAddress) => {
 													pushNotify(hostAddress, pushMessage, uuid, repeatCount, req.body.clearAfter);
 												});
 											}
 										}
 									} else if(!require(`net`).isIP(req.body.destination[i])){
-										console.log(`Removed an invalid IP address: ${req.body.destination[i]}`);
+										//console.log(`Removed an invalid IP address: ${req.body.destination[i]}`);
 										req.body.destination[i] = ``;
 									}
 									if(req.body.destination[i].length){
@@ -158,89 +159,89 @@ router.post(`/:notifyfunction`, (req, res) => {
 								// CIDR notation of subnet
 								if(parseInt(req.body.destination[0].split(`/`)[1]) > 0 && parseInt(req.body.destination[0].split(`/`)[1]) < 32){
 									if(require(`net`).isIP(req.body.destination[0].split(`/`)[0])){
-										console.log(`CIDR address detected: ${req.body.destination[0]}`);
+										//console.log(`CIDR address detected: ${req.body.destination[0]}`);
 										ipRange.getIPRange(req.body.destination[0]).forEach((hostAddress) => {
 											pushNotify(hostAddress, pushMessage, uuid, repeatCount, req.body.clearAfter);
 										});
 										res.json({ end: true });
 									} else {
-										console.log(`CIDR address detected, but IP DDN format is incorrect.`);
+										//console.log(`CIDR address detected, but IP DDN format is incorrect.`);
 										res.json({ end: true });
 									}
 								} else {
-									console.log(`CIDR notation out of range: ${parseInt(req.body.destination[0].split(`/`)[1])}`);
+									//console.log(`CIDR notation out of range: ${parseInt(req.body.destination[0].split(`/`)[1])}`);
 									res.json({ end: true });
 								}					
 							} else if(req.body.destination[0].match(/-/g)){
 								// Range of IPs
 								if(req.body.destination[0].match(/-/g).length > 1){
-									console.log(`Too many dashes in range`);
+									//console.log(`Too many dashes in range`);
 									res.json({ end: true });
 								} else {
 									if(require(`net`).isIP(req.body.destination[0].split(`-`)[0]) && require(`net`).isIP(req.body.destination[0].split(`-`)[1])){
-										console.log(`IP range detected: ${req.body.destination}`);
+										//console.log(`IP range detected: ${req.body.destination}`);
 										ipRange.getIPRange(req.body.destination[0]).forEach((hostAddress) => {
 											pushNotify(hostAddress, pushMessage, uuid, repeatCount, req.body.clearAfter);
 										});
 										res.json({ end: true });
 									} else {
-										console.log(`IP range detected, but IP DDN format is incorrect.`);
+										//console.log(`IP range detected, but IP DDN format is incorrect.`);
 										res.json({ end: true });
 									}
 								}
 							} else if(require(`net`).isIP(req.body.destination[0])){
-								console.log(`Single IP detected: ${req.body.destination}`);
+								//console.log(`Single IP detected: ${req.body.destination}`);
 								pushNotify(req.body.destination[0], pushMessage, uuid, repeatCount, req.body.clearAfter);
 								res.json({ end: true });
 							} else {
-								console.log(`Something went wrong`);
-								console.log(`\nreq.params`);
-								console.log(req.params);
-								console.log(`\nreq.query`);
-								console.log(req.query);
-								console.log(`\nreq.body`);
-								console.log(req.body);
+								//console.log(`Something went wrong`);
+								//console.log(`\nreq.params`);
+								//console.log(req.params);
+								//console.log(`\nreq.query`);
+								//console.log(req.query);
+								//console.log(`\nreq.body`);
+								//console.log(req.body);
 								res.json({ end: true });
 							}	
 						} else {
-							console.log(`Something went wrong`);
-							console.log(`\nreq.params`);
-							console.log(req.params);
-							console.log(`\nreq.query`);
-							console.log(req.query);
-							console.log(`\nreq.body`);
-							console.log(req.body);
+							//console.log(`Something went wrong`);
+							//console.log(`\nreq.params`);
+							//console.log(req.params);
+							//console.log(`\nreq.query`);
+							//console.log(req.query);
+							//console.log(`\nreq.body`);
+							//console.log(req.body);
 							res.json({ end: true });
 						}
 					} else {
-						console.log(`Something went wrong`);
-						console.log(`\nreq.params`);
-						console.log(req.params);
-						console.log(`\nreq.query`);
-						console.log(req.query);
-						console.log(`\nreq.body`);
-						console.log(req.body);
+						//console.log(`Something went wrong`);
+						//console.log(`\nreq.params`);
+						//console.log(req.params);
+						//console.log(`\nreq.query`);
+						//console.log(req.query);
+						//console.log(`\nreq.body`);
+						//console.log(req.body);
 						res.json({ end: true });
 					}
 				});
 			} else {
-				console.log(`Something went wrong`);
-				console.log(`\nreq.params`);
-				console.log(req.params);
-				console.log(`\nreq.query`);
-				console.log(req.query);
-				console.log(`\nreq.body`);
-				console.log(req.body);
+				//console.log(`Something went wrong`);
+				//console.log(`\nreq.params`);
+				//console.log(req.params);
+				//console.log(`\nreq.query`);
+				//console.log(req.query);
+				//console.log(`\nreq.body`);
+				//console.log(req.body);
 				res.json({ end: true });
 			}
 		} else {
-			console.log(`Something went wrong`);
-			console.log(`\nreq.params`);
-			console.log(req.params);
-			console.log(`\nreq.query`);
-			console.log(req.query);
-			console.log(`\nreq.body`);
-			console.log(req.body);
+			//console.log(`Something went wrong`);
+			//console.log(`\nreq.params`);
+			//console.log(req.params);
+			//console.log(`\nreq.query`);
+			//console.log(req.query);
+			//console.log(`\nreq.body`);
+			//console.log(req.body);
 			res.json({ end: true });
 		}		
 	} else {
@@ -352,7 +353,7 @@ pushNotify = (hostAddress, pushMessage, uuid, repeatCount, clearAfter) => {
 			}, intervalTimer);
 		}
 	}).catch((err) => {
-		console.log(`No response from host: ${hostAddress}`);
+		//console.log(`No response from host: ${hostAddress}`);
 	});;		
 }
 	
