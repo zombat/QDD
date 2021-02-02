@@ -41,8 +41,8 @@ router.get(`/:context`, (req, res) => {
 			req.query.skip = 0;
 		} 
 		let contextObject = {};
-		if(contextArray.indexOf(`global`) == -0){
-			contextObject = { locationContexts: { $in: contextArray }};
+		if(contextArray.indexOf(`global`) >= 0){
+			contextObject = { };
 		}
 		mongoClient.get().db(process.env.DIRECTORY_DATABASE).collection(process.env.DIRECTORY_COLLECTION).find(contextObject).skip(parseInt(req.query.skip)).count((err, documentCount) => {
 			mongoClient.get().db(process.env.DIRECTORY_DATABASE).collection(process.env.DIRECTORY_COLLECTION).find(contextObject).skip(parseInt(req.query.skip)).limit(resultLimit).toArray((err, documents) => {
