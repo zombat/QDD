@@ -232,7 +232,6 @@ alertEntrySelect = (data, alertType) => {
 				$(`#push-notification-send`).attr(`disabled`, false);
 				$(`#push-notification-cancel-notification-area`).remove();
 			} else if(res.doucmentType == `active-alert`){
-				console.log(res.document.alertDocument);
 				$(`#push-notification-notification-title-box`).val(res.document.alertDocument.notificationTitle);
 				$(`#push-notification-notification-text-box`).val(res.document.alertDocument.notificationText);
 				$(`#push-notification-led-color`).val(``);
@@ -274,14 +273,12 @@ searchAlerts = () => {
 	$.getJSON(`push-notification-app/SearchAlerts/${searchString}`).done((res) => {
 		if(res.hasOwnProperty(`activeAlerts`) && res.hasOwnProperty(`alertTemplates`)){
 			res.activeAlerts.forEach((activeAlertEntry) => {
-				console.log(activeAlertEntry);
 				let appendHTML = `<div class="result-entry">\n`;
 					appendHTML+= `<div onclick="alertEntrySelect('${activeAlertEntry._id}','active-alert')"> <i class="fas fa-exclamation-triangle" aria-hidden="true"></i> <i class="fas fa-spin fa-spinner" aria-hidden="true"></i>  ${activeAlertEntry.alertDocument.notificationTitle}</div>\n`;
 					appendHTML+= `</div>\n`;
 				$(`#push-notification-alert-template-results`).append(appendHTML);
 			});
 			res.alertTemplates.forEach((resultTemplateEntry) => {
-				console.log(resultTemplateEntry);
 				let appendHTML = `<div class="result-entry">\n`;
 					appendHTML+= `<div onclick="alertEntrySelect('${resultTemplateEntry._id}','alert-template')">${resultTemplateEntry.notificationTitle}</div>\n`;
 					appendHTML+= `</div>\n`;
