@@ -9,18 +9,22 @@ const	assert = require(`assert`),
 
 // Does not close on DT730 (and probably all 700 series) phones
 		
-router.get(`/`, (req, res) => {	
-	let trackingPage  = `<DtermIPText title='Notice to All Users'>`;
-		trackingPage += `<Text>STOP IMMEDIATELY if you do not agree to the conditions stated in this warning\n\nThis system is for authorized use only. Users have no explicit or implicit expectation of privacy. Any or all uses of this system and all data on this system may be intercepted, monitored, recorded, copied, audited, inspected, and disclosed to authorized sites and law enforcement personnel, as well as authorized officials of other agencies. By using this system, the user consent to such disclosure at the discretion of authorized site personnel. Unauthorized or improper use of this system may result in administrative disciplinary action, civil and criminal penalties. By continuing to use this system you indicate your awareness of and consent to these terms and conditions of use.</Text>`;
-		trackingPage += `<SoftKeyItem index='1' name='Up'><URI>SoftKey:Up</URI></SoftKeyItem>`;
-		trackingPage += `<SoftKeyItem index='2' name='Down'><URI>SoftKey:Down</URI></SoftKeyItem>`;
-		trackingPage += `<SoftKeyItem index='4' name='Agree'><URI>XMLWindow:Finish</URI></SoftKeyItem>`;						
-		trackingPage += `</DtermIPText>`;
-	res.writeHead(200, { 'Content-Type': `text/html` });
-	res.end(trackingPage);
-
-	updateDtermIpAddress(req, [], (response) => {
-		console.log(response);
+router.get(`/`, (req, res) => {
+	mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`global-configuration`).findOne({ _id: `phone-banner-message`}, (err, mongoRes) => {
+		assert.equal(null, err);
+		if(mongoRes == null){
+			necXML.generateTextPage(`Error`, `Page not found`, [[`Exit`, `XMLWindow:Finish`]], (textPage) => {
+				res.writeHead(200, { 'Content-Type': `text/html` });
+				res.end(textPage)
+			});
+		} else {
+			necXML.generateTextPage(mongoRes.bannerTitle, mongoRes.bannerText, [[`Up`, `SoftKey:Up`],[`Down`, `SoftKey:Down`],[],[`Agree`, `XMLWindow:Finish`]], (textPage) => {
+				res.writeHead(200, { 'Content-Type': `text/html` });
+				res.end(textPage);
+			});
+			updateDtermIpAddress(req, [], (response) => {
+			});
+		}
 	});
 });
 
@@ -30,7 +34,6 @@ updateDtermIpAddress = (req, contextArray) => {
 	} else {
 		var hostAddress = `[${req._remoteAddress}]`;
 	}
-	console.log(hostAddress);
 	got(`http://${hostAddress}/header.cgi`).then(response => {	
 		var document = {
 			extension: req.headers[`user-agent`].split(`/`)[7],

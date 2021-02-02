@@ -29,10 +29,12 @@ router.get(`/:context`, (req, res) => {
 	let date = new Date();
 	mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(process.env.STATISTICS_COLLECTION).insertOne({ timeStamp: date, reqHeaders: req.headers, urlAccessed: `DTerm Directory` }, (err, res) => {
 		assert.equal(null, err);
-		});
+	});
 	if(req.query.hasOwnProperty(`support`) && req.query.support.match(/true/i)){
-		res.writeHead(200, { 'Content-Type': `text/html` });
-		res.end(necXML.generateTextPage(`Support Information`, `Extension Number: ${req.headers['user-agent'].split('/')[7]}\nIP Address: ${req._remoteAddress}\nLocation Contexts: ${contextArray.join(', ')}\n`, [[`Back`, `SoftKey:Back`]]));
+		necXML.generateTextPage(`Support Information`, `Extension Number: ${req.headers['user-agent'].split('/')[7]}\nIP Address: ${req._remoteAddress}\nLocation Contexts: ${contextArray.join(', ')}\n`, [[`Back`, `SoftKey:Back`]], (textPage) => {
+			res.writeHead(200, { 'Content-Type': `text/html` });
+			res.end(textPage);
+		});
 	} else if(req.query.hasOwnProperty(`browse`) && req.query.browse.match(/true/i) || req.query.hasOwnProperty(`skip`)){
 		// Browse the directory
 		if(!req.query.hasOwnProperty(`skip`) || req.query.skip < 0){
@@ -46,8 +48,10 @@ router.get(`/:context`, (req, res) => {
 			mongoClient.get().db(process.env.DIRECTORY_DATABASE).collection(process.env.DIRECTORY_COLLECTION).find(contextObject).skip(parseInt(req.query.skip)).limit(resultLimit).toArray((err, documents) => {
 				if(documents.length === 0){
 					// No search results.
-					res.writeHead(200, { 'Content-Type': `text/html` });
-					res.end(necXML.generateTextPage(`Search Results`, `No directory results available.\n\nIf you feel that this is an error, please contact your system administrator.\n\nExtension Number: ${req.headers['user-agent'].split('/')[7]}\nDirectory Location Context: ${contextArray[0]}`, [[`Back`, `SoftKey:Back`]]));
+					necXML.generateTextPage(`Search Results`, `No directory results available.\n\nIf you feel that this is an error, please contact your system administrator.\n\nExtension Number: ${req.headers['user-agent'].split('/')[7]}\nDirectory Location Context: ${contextArray[0]}`, [[`Back`, `SoftKey:Back`]], (textPage) => {
+						res.writeHead(200, { 'Content-Type': `text/html` });
+						res.end(textPage);
+					});
 				} else {					
 					let itemArray = [];
 					assert.equal(null, err);			
@@ -56,19 +60,23 @@ router.get(`/:context`, (req, res) => {
 						}
 					documents.forEach((document) =>{
 						itemArray.push([`${document.firstName} ${document.lastName}`,`${serverUri}/dtd/${req.params.context}?id=${document._id}`]);
-						});
-						if(documentCount > resultLimit){
-							itemArray.push([`More Results...`,`${serverUri}/dtd/${req.params.context}?skip=${parseInt(req.query.skip) + resultLimit}`]);
-						}
+					});
+					if(documentCount > resultLimit){
+						itemArray.push([`More Results...`,`${serverUri}/dtd/${req.params.context}?skip=${parseInt(req.query.skip) + resultLimit}`]);
+					}
+					necXML.generateDtermIPList(`Browse`,itemArray,[[`Back`, `SoftKey:Back`]], (dtermIPList) => {
 						res.writeHead(200, { 'Content-Type': `text/html` });
-						res.end(necXML.generateDtermIPList(`Browse`,itemArray,[[`Back`, `SoftKey:Back`]]));
+						res.end(dtermIPList);
+					});	
 				}
 			});
 		});
 	} else if(req.query.hasOwnProperty(`search`) && req.query.search.match(/true/i)) {
 		// Display the search screen.
-		res.writeHead(200, { 'Content-Type': `text/html` });
-		res.end(necXML.generateDtermIPInput(`Search Directory`, `${serverUri}/dtd/${req.params.context}`, `Search`, `Text`, `searchString`, `5`, [[`Back`,`SoftKey:Back`],[`Delete`,`SoftKey:BackSpace`]]));
+		necXML.generateDtermIPInput(`Search Directory`, `${serverUri}/dtd/${req.params.context}`, `Search`, `Text`, `searchString`, `5`, [[`Back`,`SoftKey:Back`],[`Delete`,`SoftKey:BackSpace`]], (dtermIPInput) => {
+			res.writeHead(200, { 'Content-Type': `text/html` });
+			res.end(dtermIPInput);
+		});	
 	} else if(req.query.searchString){
 		var skipCount = 0;
 		// Look, I know it's ugly... It's just that the phone hates having more than one query.
@@ -92,8 +100,10 @@ router.get(`/:context`, (req, res) => {
 				// Check for results.
 				if(documents.length === 0){
 					// No search results.
-					res.writeHead(200, { 'Content-Type': `text/html` });
-					res.end(necXML.generateTextPage(`Search Results`, `No results found (first or last name) for the search: ${req.query.searchString}\n\nIf you feel that this is an error, please contact your system administrator.\n\nExtension Number: ${req.headers['user-agent'].split('/')[7]}\nDirectory Location Context: ${contextArray[0]}`, [[`Back`, `SoftKey:Back`]]));
+					necXML.generateTextPage(`Search Results`, `No results found (first or last name) for the search: ${req.query.searchString}\n\nIf you feel that this is an error, please contact your system administrator.\n\nExtension Number: ${req.headers['user-agent'].split('/')[7]}\nDirectory Location Context: ${contextArray[0]}`, [[`Back`, `SoftKey:Back`]], (textPage) => {
+						res.writeHead(200, { 'Content-Type': `text/html` });
+						res.end(textPage);
+					});					
 				} else {		
 					// Display search results.
 					let itemArray = [];
@@ -106,13 +116,14 @@ router.get(`/:context`, (req, res) => {
 						if(documentCount > resultLimit){
 							itemArray.push([`More Results...`,`${serverUri}/dtd/${req.params.context}?searchString=${req.query.searchString}:skip=${skipCount + resultLimit}`]);
 						}
-					res.writeHead(200, { 'Content-Type': `text/html` });
-					res.end(necXML.generateDtermIPList(`Search Results`,itemArray,[[`Back`, `SoftKey:Back`]]));
+					necXML.generateDtermIPList(`Search Results`,itemArray,[[`Back`, `SoftKey:Back`]], (dtermIPList) =>{
+						res.writeHead(200, { 'Content-Type': `text/html` });
+						res.end(dtermIPList);
+					});
 				}
 			});
 		});
 	} else if(req.query.id){
-		console.log(req.query);
 		if(req.query.index){
 		let objectID = require(`mongodb`).ObjectID(req.query.id.toString());
 		
@@ -120,8 +131,10 @@ router.get(`/:context`, (req, res) => {
 			assert.equal(null, err);
 			if(document[0].contactMethods[req.query.index]){
 				res.writeHead(200, { 'Content-Type': `text/html` });
-				res.end(necXML.generateDirectoryPage(`${document[0].firstName} ${document[0].lastName}`, document[0].contactMethods[req.query.index].contactMethodName, document[0].contactMethods[req.query.index].contactMethodNumber, [[`Back`,`SoftKey:Back`],[],[],[`Dial`,`SoftKey:Dial`]]));
-				}
+				necXML.generateDirectoryPage(`${document[0].firstName} ${document[0].lastName}`, document[0].contactMethods[req.query.index].contactMethodName, document[0].contactMethods[req.query.index].contactMethodNumber, [[`Back`,`SoftKey:Back`],[],[],[`Dial`,`SoftKey:Dial`]], (directoryPage) => {
+					res.end(directoryPage);
+				});				
+			}
 			});
 		} else {
 			// Get document by _id and display.
@@ -142,9 +155,13 @@ router.get(`/:context`, (req, res) => {
 	} else {
 		// Just show the main directory menu.
 		updateDtermIpAddress(req, contextArray);
-		res.writeHead(200, { 'Content-Type': `text/html` });
+		
 		let directoryMainMenu = `<DtermIPList title='' column='1'>\n`;
-		res.end(necXML.generateDtermIPList(`Corporate Directory`,[[`Browse Directory`,`${serverUri}/dtd/${req.params.context}?browse=true`],[`Search Directory`,`${serverUri}/dtd/${req.params.context}?search=true`],[`Support Information`,`${serverUri}/dtd/${req.params.context}?support=true`]],[[`Back`, `SoftKey:Back`]]));
+		necXML.generateDtermIPList(`Corporate Directory`,[[`Browse Directory`,`${serverUri}/dtd/${req.params.context}?browse=true`],[`Search Directory`,`${serverUri}/dtd/${req.params.context}?search=true`],[`Support Information`,`${serverUri}/dtd/${req.params.context}?support=true`]],[[`Back`, `SoftKey:Back`]], (dtermIPList) =>{
+			res.writeHead(200, { 'Content-Type': `text/html` });
+			res.end(dtermIPList);
+		});	
+		
 	}
 });
 

@@ -170,6 +170,15 @@ mongoClient.connect(() => {
 				assert.equal(null, err);
 				console.log(mongoRes);
 			});
+			
+		let globalVariables = [
+			{ _id: `phone-banner-message`, bannerTitle:`Notice to All Users`, bannerText :`STOP IMMEDIATELY if you do not agree to the conditions stated in this warning. This system is for authorized use only. Users have no explicit or implicit expectation of privacy. Any or all uses of this system and all data on this system may be intercepted, monitored, recorded, copied, audited, inspected, and disclosed to authorized sites and law enforcement personnel, as well as authorized officials of other agencies. By using this system, the user consent to such disclosure at the discretion of authorized site personnel. Unauthorized or improper use of this system may result in administrative disciplinary action, civil and criminal penalties. By continuing to use this system you indicate your awareness of and consent to these terms and conditions of use.`},
+			{_id: `outside-number-prefix`,}
+		];	
+			mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`global-configuration`).insertMany(globalVariables, (err, mongoRes) => {
+				assert.equal(null, err);
+				console.log(mongoRes);
+			});
 	}
 	
 	// ----------------------------------------------------------------------------------------------------------------------  Web Interface Routes
