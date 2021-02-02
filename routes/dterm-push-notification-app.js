@@ -30,8 +30,10 @@ router.get(`/:uuid`, (req, res) => {
 				}
 				mongoClient.get().db(process.env.DIRECTORY_DATABASE).collection(process.env.SENT_NOTIFICATION_COLLECTION).updateOne( { _id: returnDocument._id}, { $set: returnDocument }, (err, mongoRes) => { 
 					assert.equal(null, err);
-					res.writeHead(200, { 'Content-Type': `text/html` });
-					res.end(necXML.generateTextPage(`Acknowledged Alert`, `Acknowledged alert.\nTime: ${timeStamp}`, [[`Exit`, `SoftKey:Exit`]]));
+					necXML.generateTextPage(`Acknowledged Alert`, `Acknowledged alert.\nTime: ${timeStamp}`, [[`Exit`, `SoftKey:Exit`]], (textPage) => {
+						res.writeHead(200, { 'Content-Type': `text/html` });
+						res.end(textPage);
+					});
 				});
 			}				
 		});
@@ -42,19 +44,25 @@ router.get(`/:uuid`, (req, res) => {
 			if(updatedDocument.value == null){
 				mongoClient.get().db(process.env.DIRECTORY_DATABASE).collection(process.env.SENT_NOTIFICATION_COLLECTION).findOne({ _id: req.params.uuid}, (err, returnDocument) => {
 					if(returnDocument == null){
-						res.writeHead(200, { 'Content-Type': `text/html` });
-						res.end(necXML.generateTextPage(`Alert Cleared`, `The previous alert has been cleared or has expired\nPress Exit or Back to close this window.`, [[`Exit`, `SoftKey:Exit`]]));
+						necXML.generateTextPage(`Alert Cleared`, `The previous alert has been cleared or has expired\nPress Exit or Back to close this window.`, [[`Exit`, `SoftKey:Exit`]], (textPage) => {
+							res.writeHead(200, { 'Content-Type': `text/html` });
+							res.end(textPage);
+						});
 					} else {
-						res.writeHead(200, { 'Content-Type': `text/html` });
-						res.end(necXML.generateTextPage(returnDocument.alertDocument.notificationTitle, returnDocument.alertDocument.notificationText, [[`Exit`, `SoftKey:Exit`],[],[],[`Ack`,`http://${pushServer}/dtp/${req.params.uuid}?acknowlede=true`]]));
+						necXML.generateTextPage(returnDocument.alertDocument.notificationTitle, returnDocument.alertDocument.notificationText, [[`Exit`, `SoftKey:Exit`],[],[],[`Ack`,`http://${pushServer}/dtp/${req.params.uuid}?acknowlede=true`]],(textPage) => {
+							res.writeHead(200, { 'Content-Type': `text/html` });
+							res.end(textPage);
+						});
 					}
 				});
 			//} else if(updatedDocument.value.alertDocument.notificationText == `%BLANK%`){
 			//	res.writeHead(200, { 'Content-Type': `text/html` });
 			//	res.end('<Close />');
 			} else {
-				res.writeHead(200, { 'Content-Type': `text/html` });
-				res.end(necXML.generateTextPage(updatedDocument.value.alertDocument.notificationTitle, updatedDocument.value.alertDocument.notificationText, [[`Exit`, `SoftKey:Exit`],[],[],[`Ack`,`http://${pushServer}/dtp/${req.params.uuid}?acknowlede=true`]]));
+				necXML.generateTextPage(updatedDocument.value.alertDocument.notificationTitle, updatedDocument.value.alertDocument.notificationText, [[`Exit`, `SoftKey:Exit`],[],[],[`Ack`,`http://${pushServer}/dtp/${req.params.uuid}?acknowlede=true`]],(textPage) => {
+					res.writeHead(200, { 'Content-Type': `text/html` });
+					res.end(textPage);
+				});
 			}
 		});
 	}
