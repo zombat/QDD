@@ -35,8 +35,8 @@ $( document ).ready(() => {
 				  },
 			  error: (err) => {
 				  if(confirm(`Connection error, or session timeout\nSelect OK to reload page.`)){
-					location.reload();
-					}
+					  location.reload();
+				  }
 				}
 			});
 	});	
@@ -90,8 +90,8 @@ $( document ).ready(() => {
 			  error: (err) => {
 				  if(confirm(`Connection error, or session timeout\nSelect OK to reload page.`)){
 					  location.reload();
-					  }
 				  }
+			  }				  
 			});	
 		}
 	});
@@ -152,7 +152,7 @@ saveNotification = (jsonDocument, patchType) =>{
 			  alert(`Saved Push Notification`);
 			  if(patchType == `cancel-active-alert`){  
 				$(`#push-notification-cancel-notification-area`).remove();
-				if($(`#push-notification-clear-after`).is(`:checked`)){}
+				if($(`#push-notification-clear-after`).is(`:checked`)){
 					var jsonDocument = {
 						destinationType: $(`#push-notification-destination-type`).val(),
 						notificationTitle: `Cancel Alert`,
@@ -167,7 +167,7 @@ saveNotification = (jsonDocument, patchType) =>{
 					} else {
 						jsonDocument.destination = $(`#device-destination`).val();
 					}	
-				
+				}
 				$.ajax({
 					  url: `push-notification-app/notifyfunction`,
 					  dataType: `JSON`,
@@ -178,17 +178,16 @@ saveNotification = (jsonDocument, patchType) =>{
 						  },
 					  error: (err) => {
 						  if(confirm(`Connection error, or session timeout\nSelect OK to reload page.`)){
-							location.reload();
-							}
+							  location.reload();
+						  }
 						}
 					});
-					  }
-					  searchAlerts();
-					  },
+			  }
+		  },
 		  error: (err) => {
 			  if(confirm(`Connection error, or session timeout\nSelect OK to reload page.`)){
 				location.reload();
-				}
+			  }
 			}
 		});	
 }
@@ -256,6 +255,11 @@ alertEntrySelect = (data, alertType) => {
 					$(`#push-notification-modifier-buttons`).append(appendHTML);
 				}
 			}
+		},
+		error: (err) => {
+			if(confirm(`Connection error, or session timeout\nSelect OK to reload page.`)){
+				location.reload();
+			}
 		}
 	});
 }
@@ -270,12 +274,14 @@ searchAlerts = () => {
 	$.getJSON(`push-notification-app/SearchAlerts/${searchString}`).done((res) => {
 		if(res.hasOwnProperty(`activeAlerts`) && res.hasOwnProperty(`alertTemplates`)){
 			res.activeAlerts.forEach((activeAlertEntry) => {
+				console.log(activeAlertEntry);
 				let appendHTML = `<div class="result-entry">\n`;
 					appendHTML+= `<div onclick="alertEntrySelect('${activeAlertEntry._id}','active-alert')"> <i class="fas fa-exclamation-triangle" aria-hidden="true"></i> <i class="fas fa-spin fa-spinner" aria-hidden="true"></i>  ${activeAlertEntry.alertDocument.notificationTitle}</div>\n`;
 					appendHTML+= `</div>\n`;
 				$(`#push-notification-alert-template-results`).append(appendHTML);
 			});
 			res.alertTemplates.forEach((resultTemplateEntry) => {
+				console.log(resultTemplateEntry);
 				let appendHTML = `<div class="result-entry">\n`;
 					appendHTML+= `<div onclick="alertEntrySelect('${resultTemplateEntry._id}','alert-template')">${resultTemplateEntry.notificationTitle}</div>\n`;
 					appendHTML+= `</div>\n`;
