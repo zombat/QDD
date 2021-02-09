@@ -5,18 +5,8 @@ const	assert = require(`assert`),
 		mongoClient = require(`../mongo-client`),
 		router = express.Router();
 
-router.get(`/js/:fileName`, (req, res) => {
-	//var requestIP = req.headers[`x-forwarded-for`] || req.connection.remoteAddress;
-		//if(req.hasOwnProperty(`user`)){
-			//let userID = req.user[`_id`] || 0;
-			//helperFunctions.getUserPermissions(userID, function(response){
-				//if(response!=null){
-					//if(response.betterTac){
-						res.sendFile( `/private/directory-app/js/` + req.params.fileName, { root: `./` });
-					//} 
-				//}
-			//});		
-		//} 
+router.get(`/js/:id`, (req, res) => {
+	res.sendFile( `/private/directory-app/js/` + req.params.id, { root: `./` });
 });
 
 router.get(`/`, (req, res) => {
@@ -28,7 +18,7 @@ router.get(`/`, (req, res) => {
 		assert.equal(null, err);
 		mongoClient.get().db(process.env.DIRECTORY_DATABASE).collection(process.env.DIRECTORY_COLLECTION).distinct(`contactMethods.contactMethodName`, (err, contactMethodArray) => {
 			assert.equal(null, err);
-			res.render(`directory-app`, { user: req.user, info: { ip: req.headers[`x-forwarded-for`] }, locationContexts: locationContextArray, contactMethodNames: contactMethodArray });
+			res.render(`directory-app`, { user: req.user, userPermissions: req.userPermissions, info: { ip: req.headers[`x-forwarded-for`] }, locationContexts: locationContextArray, contactMethodNames: contactMethodArray });
 		});
 	});
 }); 		

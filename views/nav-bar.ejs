@@ -11,12 +11,30 @@
 <title>QDDA</title>
 <div>
 	<div class="nav-bar bg-primary box-shadow container-fluid">
+		
+		
 		<% if (user) { %>
 		<a href="/logout" class="float-right nav-item" title="Sign Out" id="nav-logout"><i class="fa fa-2x fa-sign-out-alt" aria-hidden="true"></i></a>
-		<a href="/push-notification-app" class="float-right nav-item" title="Push Notification" id="nav-pushNotification"><i class="fas fa-2x fa-exclamation-triangle" aria-hidden="true"></i></a>
-		<a href="/directory-app" class="float-right nav-item" title="Directory" id="nav-directory"><i class="fa fa-2x fa-users" aria-hidden="true"></i></a>
 		<% } else { %>
-		<a href="/login" class="float-right nav-item" title="Sign in" id="nav-login"><i class="fa fa-2x fa-sign-in-alt" aria-hidden="true"></i></a>
+			<a href="/login" class="float-right nav-item" title="Sign in" id="nav-login"><i class="fa fa-2x fa-sign-in-alt" aria-hidden="true"></i></a>
 		<% } %>
+		
+		<% if (typeof userPermissions == `object`) { %>
+			<% if(userPermissions.hasOwnProperty(`system-administration`) && userPermissions[`system-administration`]) { %>
+				<a href="/system-administration" class="float-right nav-item" title="System Administration" id="nav-systemAdministration"><i class="fas fa-2x fa-toolbox" aria-hidden="true"></i></a>
+			<% } %>
+			<% if(userPermissions.hasOwnProperty(`directory-app`) && userPermissions[`directory-app`]) { %>
+				<a href="/directory-app" class="float-right nav-item" title="Directory" id="nav-directory"><i class="fa fa-2x fa-users" aria-hidden="true"></i></a>
+			<% } %>
+			<% if(userPermissions.hasOwnProperty(`push-notification-app`) && userPermissions[`push-notification-app`]) { %>
+				<a href="/push-notification-app" class="float-right nav-item" title="Push Notification" id="nav-pushNotification"><i class="fas fa-2x fa-exclamation-triangle" aria-hidden="true"></i></a>
+			<% } %>
+		<% } %>
+		
+		
+		
+		
+		
+		
 	</div>
 <div id="nav-text"></div>

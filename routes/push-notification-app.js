@@ -5,11 +5,14 @@ const	assert = require(`assert`),
 		mongoClient = require(`../mongo-client`),
 		{ v4: uuidv4 } = require(`uuid`),
 		router = express.Router(),
-		pushServer = process.env.SERVER_URI,
 		got = require(`got`),
 		ipRange = require(`get-ip-range`),
 		intervalTimer = 2000;
 		
+router.get(`/js/:id`, (req, res) => {
+	res.sendFile( `/private/push-notification-app/js/` + req.params.id, { root: `./` });
+});	
+
 router.get(`/`, (req, res) => {
 	mongoClient.get().db(process.env.DIRECTORY_DATABASE).collection(process.env.DIRECTORY_COLLECTION).distinct(`locationContexts`, (err, locationContextArray) => {
 		assert.equal(null, err);
@@ -18,7 +21,7 @@ router.get(`/`, (req, res) => {
 			mongoClient.get().db(process.env.DIRECTORY_DATABASE).collection(process.env.NOTIFICATION_TEMPLATES_COLLECTION).find({}).toArray((err, alertTemplateArray) => {
 				assert.equal(null, err);
 				locationContextArray.push(`all`);
-				res.render(`push-notification-app`, { user: req.user, info: { ip: req.headers[`x-forwarded-for`] }, locationContexts: locationContextArray, contactMethodNames: contactMethodArray, alertTemplates: alertTemplateArray });
+				res.render(`push-notification-app`, { user: req.user, userPermissions: req.userPermissions, info: { ip: req.headers[`x-forwarded-for`] }, locationContexts: locationContextArray, contactMethodNames: contactMethodArray, alertTemplates: alertTemplateArray });
 			});
 		});
 	});
@@ -80,119 +83,131 @@ router.post(`/:notifyfunction`, (req, res) => {
 				// Create alert
 				mongoClient.get().db(process.env.DIRECTORY_DATABASE).collection(process.env.SENT_NOTIFICATION_COLLECTION).insertOne({ _id: uuid, created: new Date(), createdBy: createdBy, alertDocument}, (err, mongoRes) => { 
 					assert.equal(null, err);
-					if(mongoRes.insertedCount == 1){
-						// Set up message
-						if(req.body.notificationText == `%BLANK%`){
-							var	pushMessage =`<DtermIPPush>`;
-								pushMessage += `<PushItem type='0'>`;
-								pushMessage += `<Window id='4' mode='Create' />`;
-								pushMessage += `<URL>XMLWindow:Finish</URL>`;
-								pushMessage += `</PushItem>\n`;
-								pushMessage += `</DtermIPPush>`;
-						} else {
-							var	pushMessage  = `<DtermIPPush>`;
-								pushMessage += `<PushLEDItem type='MW' color='${ledColor}'/>`;
-							if(ringType != `0`){	
-								pushMessage += `<PushRingItem number='${ringType}'/>`;
-							}
-								pushMessage += `<PushItem type='0'>`;
-								pushMessage += `<Window id='4' mode='Create'/>`;
-								pushMessage += `<URL>http://${pushServer}/dtp/${uuid}</URL>`;
-								pushMessage += `</PushItem>\n`;
-								pushMessage += `</DtermIPPush>`;	
-						}
-							
-						if(req.body.destinationType.match(/location context/i)){
-							mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`tracked-device-collection`).find({ locationContexts: { $in: req.body.destination } }).toArray((err, documents) => {
-							//console.log(documents);
-								assert.equal(null, err);
-								//console.log(`Devices to notify: ${documents.length}`);
-								//console.log(`Repeat count: ${repeatCount}`);
-								if(documents.length){
-									let notificationCount = documents.length;
-									for(var i=0;i< documents.length;i++){
-										let hostAddress = `${documents[i].ipAddress}`;
-										if(hostAddress.match(/:/)){
-											hostAddress = `[${hostAddress}]`;
-										}										
-										pushNotify(hostAddress, pushMessage, uuid, repeatCount, req.body.clearAfter);
-									}
-									res.json({ end: true, sentNotifications: documents.length });
-								} else {
-									//console.log(`no docs`);
-									res.json({ end: true });
+					mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`global-configuration`).findOne({ _id: `core-server-settings`},(err, coreServerSettings) => {
+						assert.equal(null, err);
+						if(mongoRes.insertedCount == 1 && coreServerSettings != null){
+							// Set up message
+							if(req.body.notificationText == `%BLANK%`){
+								var	pushMessage =`<DtermIPPush>`;
+									pushMessage += `<PushItem type='0'>`;
+									pushMessage += `<Window id='4' mode='Create' />`;
+									pushMessage += `<URL>XMLWindow:Finish</URL>`;
+									pushMessage += `</PushItem>\n`;
+									pushMessage += `</DtermIPPush>`;
+							} else {
+								var	pushMessage  = `<DtermIPPush>`;
+									pushMessage += `<PushLEDItem type='MW' color='${ledColor}'/>`;
+								if(ringType != `0`){	
+									pushMessage += `<PushRingItem number='${ringType}'/>`;
 								}
-							});
-						} else if(req.body.destinationType.match(/ip address/i)){
-							// Parse IP Addresses and send alerts
-							if(req.body.destination.length > 1){
-								// Comma separated IP list
-								//console.log(`Multiple IP addresses found`);
-								for(let i=0; i<req.body.destination.length;i++){
-									//console.log(req.body.destination[i]);
-									if(req.body.destination[i].match(/-/g)){
-										if(require(`net`).isIP(req.body.destination[i].split(`-`)[0]) && require(`net`).isIP(req.body.destination[i].split(`-`)[1])){
-											//console.log(`Nested IP range found`);
-											ipRange.getIPRange(req.body.destination[i]).forEach((hostAddress) => {
-												pushNotify(hostAddress, pushMessage, uuid, repeatCount, req.body.clearAfter);
-											});
+									pushMessage += `<PushItem type='0'>`;
+									pushMessage += `<Window id='4' mode='Create'/>`;
+									pushMessage += `<URL>${coreServerSettings.serverProtocol}://${coreServerSettings.serverHostname}/dtp/${uuid}</URL>`;
+									pushMessage += `</PushItem>\n`;
+									pushMessage += `</DtermIPPush>`;	
+							}
+								
+							if(req.body.destinationType.match(/location context/i)){
+								mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`tracked-device-collection`).find({ locationContexts: { $in: req.body.destination } }).toArray((err, documents) => {
+								//console.log(documents);
+									assert.equal(null, err);
+									//console.log(`Devices to notify: ${documents.length}`);
+									//console.log(`Repeat count: ${repeatCount}`);
+									if(documents.length){
+										let notificationCount = documents.length;
+										for(var i=0;i< documents.length;i++){
+											let hostAddress = `${documents[i].ipAddress}`;
+											if(hostAddress.match(/:/)){
+												hostAddress = `[${hostAddress}]`;
+											}										
+											pushNotify(hostAddress, pushMessage, uuid, repeatCount, req.body.clearAfter);
 										}
-									} else if(req.body.destination[i].match(`/`)){ 
-										if(parseInt(req.body.destination[i].split(`/`)[1]) > 0 && parseInt(req.body.destination[i].split(`/`)[1]) < 32){
-											if(require(`net`).isIP(req.body.destination[i].split(`/`)[0])){
-												//console.log(`Nested CIDR found`);
+										res.json({ end: true, sentNotifications: documents.length });
+									} else {
+										//console.log(`no docs`);
+										res.json({ end: true });
+									}
+								});
+							} else if(req.body.destinationType.match(/ip address/i)){
+								// Parse IP Addresses and send alerts
+								if(req.body.destination.length > 1){
+									// Comma separated IP list
+									//console.log(`Multiple IP addresses found`);
+									for(let i=0; i<req.body.destination.length;i++){
+										//console.log(req.body.destination[i]);
+										if(req.body.destination[i].match(/-/g)){
+											if(require(`net`).isIP(req.body.destination[i].split(`-`)[0]) && require(`net`).isIP(req.body.destination[i].split(`-`)[1])){
+												//console.log(`Nested IP range found`);
 												ipRange.getIPRange(req.body.destination[i]).forEach((hostAddress) => {
 													pushNotify(hostAddress, pushMessage, uuid, repeatCount, req.body.clearAfter);
 												});
 											}
+										} else if(req.body.destination[i].match(`/`)){ 
+											if(parseInt(req.body.destination[i].split(`/`)[1]) > 0 && parseInt(req.body.destination[i].split(`/`)[1]) < 32){
+												if(require(`net`).isIP(req.body.destination[i].split(`/`)[0])){
+													//console.log(`Nested CIDR found`);
+													ipRange.getIPRange(req.body.destination[i]).forEach((hostAddress) => {
+														pushNotify(hostAddress, pushMessage, uuid, repeatCount, req.body.clearAfter);
+													});
+												}
+											}
+										} else if(!require(`net`).isIP(req.body.destination[i])){
+											//console.log(`Removed an invalid IP address: ${req.body.destination[i]}`);
+											req.body.destination[i] = ``;
 										}
-									} else if(!require(`net`).isIP(req.body.destination[i])){
-										//console.log(`Removed an invalid IP address: ${req.body.destination[i]}`);
-										req.body.destination[i] = ``;
+										if(req.body.destination[i].length){
+											pushNotify(req.body.destination[i], pushMessage, uuid, repeatCount, req.body.clearAfter);
+										}
 									}
-									if(req.body.destination[i].length){
-										pushNotify(req.body.destination[i], pushMessage, uuid, repeatCount, req.body.clearAfter);
-									}
-								}
-								res.json({ end: true });
-							} else if(req.body.destination[0].match(`/`)){
-								// CIDR notation of subnet
-								if(parseInt(req.body.destination[0].split(`/`)[1]) > 0 && parseInt(req.body.destination[0].split(`/`)[1]) < 32){
-									if(require(`net`).isIP(req.body.destination[0].split(`/`)[0])){
-										//console.log(`CIDR address detected: ${req.body.destination[0]}`);
-										ipRange.getIPRange(req.body.destination[0]).forEach((hostAddress) => {
-											pushNotify(hostAddress, pushMessage, uuid, repeatCount, req.body.clearAfter);
-										});
+									res.json({ end: true });
+								} else if(req.body.destination[0].match(`/`)){
+									// CIDR notation of subnet
+									if(parseInt(req.body.destination[0].split(`/`)[1]) > 0 && parseInt(req.body.destination[0].split(`/`)[1]) < 32){
+										if(require(`net`).isIP(req.body.destination[0].split(`/`)[0])){
+											//console.log(`CIDR address detected: ${req.body.destination[0]}`);
+											ipRange.getIPRange(req.body.destination[0]).forEach((hostAddress) => {
+												pushNotify(hostAddress, pushMessage, uuid, repeatCount, req.body.clearAfter);
+											});
+											res.json({ end: true });
+										} else {
+											//console.log(`CIDR address detected, but IP DDN format is incorrect.`);
+											res.json({ end: true });
+										}
+									} else {
+										//console.log(`CIDR notation out of range: ${parseInt(req.body.destination[0].split(`/`)[1])}`);
+										res.json({ end: true });
+									}					
+								} else if(req.body.destination[0].match(/-/g)){
+									// Range of IPs
+									if(req.body.destination[0].match(/-/g).length > 1){
+										//console.log(`Too many dashes in range`);
 										res.json({ end: true });
 									} else {
-										//console.log(`CIDR address detected, but IP DDN format is incorrect.`);
-										res.json({ end: true });
+										if(require(`net`).isIP(req.body.destination[0].split(`-`)[0]) && require(`net`).isIP(req.body.destination[0].split(`-`)[1])){
+											//console.log(`IP range detected: ${req.body.destination}`);
+											ipRange.getIPRange(req.body.destination[0]).forEach((hostAddress) => {
+												pushNotify(hostAddress, pushMessage, uuid, repeatCount, req.body.clearAfter);
+											});
+											res.json({ end: true });
+										} else {
+											//console.log(`IP range detected, but IP DDN format is incorrect.`);
+											res.json({ end: true });
+										}
 									}
-								} else {
-									//console.log(`CIDR notation out of range: ${parseInt(req.body.destination[0].split(`/`)[1])}`);
-									res.json({ end: true });
-								}					
-							} else if(req.body.destination[0].match(/-/g)){
-								// Range of IPs
-								if(req.body.destination[0].match(/-/g).length > 1){
-									//console.log(`Too many dashes in range`);
+								} else if(require(`net`).isIP(req.body.destination[0])){
+									//console.log(`Single IP detected: ${req.body.destination}`);
+									pushNotify(req.body.destination[0], pushMessage, uuid, repeatCount, req.body.clearAfter);
 									res.json({ end: true });
 								} else {
-									if(require(`net`).isIP(req.body.destination[0].split(`-`)[0]) && require(`net`).isIP(req.body.destination[0].split(`-`)[1])){
-										//console.log(`IP range detected: ${req.body.destination}`);
-										ipRange.getIPRange(req.body.destination[0]).forEach((hostAddress) => {
-											pushNotify(hostAddress, pushMessage, uuid, repeatCount, req.body.clearAfter);
-										});
-										res.json({ end: true });
-									} else {
-										//console.log(`IP range detected, but IP DDN format is incorrect.`);
-										res.json({ end: true });
-									}
-								}
-							} else if(require(`net`).isIP(req.body.destination[0])){
-								//console.log(`Single IP detected: ${req.body.destination}`);
-								pushNotify(req.body.destination[0], pushMessage, uuid, repeatCount, req.body.clearAfter);
-								res.json({ end: true });
+									//console.log(`Something went wrong`);
+									//console.log(`\nreq.params`);
+									//console.log(req.params);
+									//console.log(`\nreq.query`);
+									//console.log(req.query);
+									//console.log(`\nreq.body`);
+									//console.log(req.body);
+									res.json({ end: true });
+								}	
 							} else {
 								//console.log(`Something went wrong`);
 								//console.log(`\nreq.params`);
@@ -202,7 +217,7 @@ router.post(`/:notifyfunction`, (req, res) => {
 								//console.log(`\nreq.body`);
 								//console.log(req.body);
 								res.json({ end: true });
-							}	
+							}
 						} else {
 							//console.log(`Something went wrong`);
 							//console.log(`\nreq.params`);
@@ -213,16 +228,7 @@ router.post(`/:notifyfunction`, (req, res) => {
 							//console.log(req.body);
 							res.json({ end: true });
 						}
-					} else {
-						//console.log(`Something went wrong`);
-						//console.log(`\nreq.params`);
-						//console.log(req.params);
-						//console.log(`\nreq.query`);
-						//console.log(req.query);
-						//console.log(`\nreq.body`);
-						//console.log(req.body);
-						res.json({ end: true });
-					}
+					});
 				});
 			} else {
 				//console.log(`Something went wrong`);

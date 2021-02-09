@@ -35,8 +35,8 @@ $( document ).ready(() => {
 				  },
 			  error: (err) => {
 				  if(confirm(`Connection error, or session timeout\nSelect OK to reload page.`)){
-					location.reload();
-					}
+					  location.reload();
+				  }
 				}
 			});
 	});	
@@ -90,8 +90,8 @@ $( document ).ready(() => {
 			  error: (err) => {
 				  if(confirm(`Connection error, or session timeout\nSelect OK to reload page.`)){
 					  location.reload();
-					  }
 				  }
+			  }				  
 			});	
 		}
 	});
@@ -152,7 +152,7 @@ saveNotification = (jsonDocument, patchType) =>{
 			  alert(`Saved Push Notification`);
 			  if(patchType == `cancel-active-alert`){  
 				$(`#push-notification-cancel-notification-area`).remove();
-				if($(`#push-notification-clear-after`).is(`:checked`)){}
+				if($(`#push-notification-clear-after`).is(`:checked`)){
 					var jsonDocument = {
 						destinationType: $(`#push-notification-destination-type`).val(),
 						notificationTitle: `Cancel Alert`,
@@ -167,7 +167,7 @@ saveNotification = (jsonDocument, patchType) =>{
 					} else {
 						jsonDocument.destination = $(`#device-destination`).val();
 					}	
-				
+				}
 				$.ajax({
 					  url: `push-notification-app/notifyfunction`,
 					  dataType: `JSON`,
@@ -178,17 +178,16 @@ saveNotification = (jsonDocument, patchType) =>{
 						  },
 					  error: (err) => {
 						  if(confirm(`Connection error, or session timeout\nSelect OK to reload page.`)){
-							location.reload();
-							}
+							  location.reload();
+						  }
 						}
 					});
-					  }
-					  searchAlerts();
-					  },
+			  }
+		  },
 		  error: (err) => {
 			  if(confirm(`Connection error, or session timeout\nSelect OK to reload page.`)){
 				location.reload();
-				}
+			  }
 			}
 		});	
 }
@@ -233,7 +232,6 @@ alertEntrySelect = (data, alertType) => {
 				$(`#push-notification-send`).attr(`disabled`, false);
 				$(`#push-notification-cancel-notification-area`).remove();
 			} else if(res.doucmentType == `active-alert`){
-				console.log(res.document.alertDocument);
 				$(`#push-notification-notification-title-box`).val(res.document.alertDocument.notificationTitle);
 				$(`#push-notification-notification-text-box`).val(res.document.alertDocument.notificationText);
 				$(`#push-notification-led-color`).val(``);
@@ -255,6 +253,11 @@ alertEntrySelect = (data, alertType) => {
 				if(!$(`#push-notification-cancel`).length){
 					$(`#push-notification-modifier-buttons`).append(appendHTML);
 				}
+			}
+		},
+		error: (err) => {
+			if(confirm(`Connection error, or session timeout\nSelect OK to reload page.`)){
+				location.reload();
 			}
 		}
 	});
