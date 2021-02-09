@@ -23,7 +23,7 @@ router.get(`/`, (req, res) => {
 	});
 });
 
-router.patch(`/update/:updateParam`, (req, res) => {	
+router.patch(`/update/:updateParam`, (req, res) => {
 	if(req.params.updateParam == `global-variables`){
 		req.body.data.forEach((eachVariable) => {
 			let id = eachVariable._id;

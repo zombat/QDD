@@ -7,7 +7,7 @@ const	assert = require(`assert`),
 		fs = require(`fs`),
 		bodyParser = require(`body-parser`),
 		mongo = require(`mongodb`).MongoClient,
-		mongoClient = require(`./mongo-client`),	
+		mongoClient = require(`./mongo-client`),
 		mongoose = require(`mongoose`),
 		mongooseSchema = mongoose.Schema,
 		passport = require(`passport`),
@@ -80,7 +80,7 @@ app.use(`/public`, express.static(`${process.cwd()}/public`));
 app.use( bodyParser.json() );       // to support JSON-encoded bodies
 app.use(bodyParser.urlencoded({     // to support URL-encoded bodies
   extended: true
-})); 
+}));
 
 // Configure view engine to render EJS templates.
 app.set(`views`, `${__dirname}/views`);
@@ -96,7 +96,7 @@ app.use(require(`body-parser`).urlencoded({ extended: true }));
 // Initialize Passport and restore authentication state, if any, from the
 // session.
 
-app.use(session({ 
+app.use(session({
 	secret: process.env.SESSION_SECRET,
 	resave: true,
 	rolling: true,
@@ -114,7 +114,7 @@ app.use(session({
 	}));
 app.use(passport.initialize());
 app.use(passport.session());
-//app.use((tfa));	
+//app.use((tfa));
 tweakUsername = (req, res, next) => {
 	req.body.username = req.body.username.trim().toLowerCase();
 	next();
@@ -129,7 +129,7 @@ mongoClient.connect(() => {
 	app.use(`/dtp`, dtermPushNotificationAppRoute);
 	app.use(`/track`, dtermTrackingAppRoute);
 	app.use(`/system-administration`, ensureLoggedIn, getUserPermissions, systemAdministrationRoute);
-	
+
 	// Initiate administrator account
 	if(process.argv.indexOf(`--initAdminUser`) >= 0){
 		if(process.argv.length == process.argv.indexOf(`--initAdminUser`)+1){
@@ -156,7 +156,7 @@ mongoClient.connect(() => {
 			});
 		}
 	}
-	if(process.argv.indexOf(`--databaseInit`) >= 0){
+	if(process.argv.indexOf(`--initDatabase`) >= 0){
 		let deviceInformation = [
 			{ _id: `9.1.3.0`, version: `5.0.9.0`, firmwareName: `itlisips.tgz`, series: `DT710`, models: [`SIP_ITL_2E`,`SIP_ITL_6DE`] },
 			{ _id: `9.1.3.3`, version: `5.0.9.0`, firmwareName: `itlisipv.tgz`, series: `DT730`, models: [`SIP_ITL_12D`, `SIP_ITL_24D`, `SIP_ITL_32D`,`SIP_ITL_8LD`] },
@@ -176,48 +176,48 @@ mongoClient.connect(() => {
 				assert.equal(null, err);
 				console.log(mongoRes);
 			});
-			
+
 		let globalVariables = [
 			{ _id: `phone-banner-message`, bannerTitle:`Notice to All Users`, bannerText :`STOP IMMEDIATELY if you do not agree to the conditions stated in this warning. This system is for authorized use only. Users have no explicit or implicit expectation of privacy. Any or all uses of this system and all data on this system may be intercepted, monitored, recorded, copied, audited, inspected, and disclosed to authorized sites and law enforcement personnel, as well as authorized officials of other agencies. By using this system, the user consent to such disclosure at the discretion of authorized site personnel. Unauthorized or improper use of this system may result in administrative disciplinary action, civil and criminal penalties. By continuing to use this system you indicate your awareness of and consent to these terms and conditions of use.`},
-			{ _id: `outside-number-prefix`, outsideAccessCode: `9`, countryCode: `1`, dialRules: `US` },
+			{ _id: `outside-number-prefix`, addPrefix: true, outsideAccessCode: `9`, countryCode: `1`, dialRules: `US` },
 			{ _id: `core-server-settings`, serverHostname: `10.4.0.150`, serverProtocol: `http` }
-		];	
+		];
 			mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`global-configuration`).insertMany(globalVariables, (err, mongoRes) => {
 				assert.equal(null, err);
 				console.log(mongoRes);
 			});
 	}
-	
+
 	// ----------------------------------------------------------------------------------------------------------------------  Web Interface Routes
-	
+
 	app.get(`/login`, (req, res) => {
 		console.log(req.user);
 		res.render(`login-page`, { user: req.user });
 		});
-	
+
 	app.post(`/login`, tweakUsername, passport.authenticate(`local`, {
-		successReturnToOrRedirect: `/`,	  
+		successReturnToOrRedirect: `/`,
 		failureRedirect: `/login`
 		}), (req, res)  => {
 			res.redirect(`/directory-app`);
 		});
-		
+
 	app.get(`/logout`, (req, res) => {
 		req.logout();
 		res.redirect(`/`);
 		});
-	
+
 	app.get(`/`, getUserPermissions, (req, res) => {
 		res.render(`home-page`, { user: req.user, userPermissions: req.userPermissions });
 		});
-});	
+});
 
 getUserPermissions = (req, res, next) => {
 	if(req.user){
 		mongoClient.get().db(process.env.MONGO_AUTH_DATABASE).collection(`user-permissions`).findOne({ _id: req.user._id }, (err, mongoRes) => {
-			req.userPermissions = mongoRes.userPermissions;		
+			req.userPermissions = mongoRes.userPermissions;
 			if(mongoRes.userPermissions[req.baseUrl.replace(/\//g,``)] || req.baseUrl == `` || req.baseUrl == `/login`){
-				next();	
+				next();
 			} else {
 				res.redirect(`/`);
 			}
@@ -244,7 +244,7 @@ if(process.env.HTTPS == `true`){
 			cert: fs.readFileSync(`./.cert/server.crt`)
 		}, app).listen(443, () => {
 			console.log(`HTTPS listening on port 443`)
-		});	
+		});
 	} catch {
 		console.log(`Error starting https, are cert files available?`);
 		startHttpServer();
