@@ -24,8 +24,9 @@ const	directoryAppRoute = require(`./routes/directory-app`),
 		dtermDirectoryAppRoute = require(`./routes/dterm-directory-app`),
 		pushNotificationAppRoute = require(`./routes/push-notification-app`),
 		dtermPushNotificationAppRoute = require(`./routes/dterm-push-notification-app`),
-		dtermTrackingAppRoute= require(`./routes/dterm-tracking-app`);
-		systemAdministrationRoute= require(`./routes/system-administration`);
+		dtermTrackingAppRoute= require(`./routes/dterm-tracking-app`),
+		systemAdministrationRoute= require(`./routes/system-administration`),
+		userManagementRoute= require(`./routes/user-management-app`);
 
 // MongoDB Connection URI
 if(process.env.MONGO_USER.length && process.env.MONGO_PASSWORD){
@@ -127,8 +128,11 @@ mongoClient.connect(() => {
 	app.use(`/dtd`, dtermDirectoryAppRoute);
 	app.use(`/push-notification-app`, ensureLoggedIn, getUserPermissions, pushNotificationAppRoute);
 	app.use(`/dtp`, dtermPushNotificationAppRoute);
-	app.use(`/track`, dtermTrackingAppRoute);
+	app.use(`/track`, dtermTrackingAppRoute.router);
 	app.use(`/system-administration`, ensureLoggedIn, getUserPermissions, systemAdministrationRoute);
+	app.use(`/user-management-app`, ensureLoggedIn, getUserPermissions, userManagementRoute);
+
+	dtermTrackingAppRoute.phoneTracker();
 
 	// Initiate administrator account
 	if(process.argv.indexOf(`--initAdminUser`) >= 0){
@@ -144,7 +148,7 @@ mongoClient.connect(() => {
 					console.log(err.message);
 					process.exit(1);
 				} else if(user != undefined){
-					mongoClient.get().db(process.env.MONGO_AUTH_DATABASE).collection(`user-permissions`).insertOne({ _id: user._id, userPermissions: { 'system-administration': true } }, (err, res) => {
+					mongoClient.get().db(process.env.MONGO_AUTH_DATABASE).collection(`user-permissions`).insertOne({ _id: user._id, userPermissions: { 'system-administration': true, 'user-management-app': true } }, (err, res) => {
 					assert.equal(null, err);
 					console.log(`Created Administrator Account:\n\tUser Name: ${user.username}`);
 					process.exit(0);
@@ -174,26 +178,28 @@ mongoClient.connect(() => {
 			];
 			mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`nec-devices`).insertMany(deviceInformation, (err, mongoRes) => {
 				assert.equal(null, err);
-				console.log(mongoRes);
 			});
 
 		let globalVariables = [
-			{ _id: `phone-banner-message`, bannerTitle:`Notice to All Users`, bannerText :`STOP IMMEDIATELY if you do not agree to the conditions stated in this warning. This system is for authorized use only. Users have no explicit or implicit expectation of privacy. Any or all uses of this system and all data on this system may be intercepted, monitored, recorded, copied, audited, inspected, and disclosed to authorized sites and law enforcement personnel, as well as authorized officials of other agencies. By using this system, the user consent to such disclosure at the discretion of authorized site personnel. Unauthorized or improper use of this system may result in administrative disciplinary action, civil and criminal penalties. By continuing to use this system you indicate your awareness of and consent to these terms and conditions of use.`},
-			{ _id: `outside-number-prefix`, addPrefix: true, outsideAccessCode: `9`, countryCode: `1`, dialRules: `US` },
-			{ _id: `core-server-settings`, serverHostname: `10.4.0.150`, serverProtocol: `http` }
+			{ _id: `phone-banner-message`, bannerTitle:`Notice to All Users`, bannerText :`STOP IMMEDIATELY if you do not agree to the conditions stated in this warning. This system is for authorized use only. Users have no explicit or implicit expectation of privacy. Any or all uses of this system and all data on this system may be intercepted, monitored, recorded, copied, audited, inspected, and disclosed to authorized sites and law enforcement personnel, as well as authorized officials of other agencies. By using this system, the user consent to such disclosure at the discretion of authorized site personnel. Unauthorized or improper use of this system may result in administrative disciplinary action, civil and criminal penalties. By continuing to use this system you indicate your awareness of and consent to these terms and conditions of use.`, note: `This can be displayed on an IP phone when booting, and is used as a MOTD and a quick way to track IP phone information.`},
+			{ _id: `outside-number-prefix`, addPrefix: true, outsideAccessCode: `9`, countryCode: `1`, dialRules: `US`, note: `Define outside dialing rules. Only  US is supported at this time.`},
+			{ _id: `core-server-settings`, serverHostname: `10.4.0.150`, serverProtocol: `http`, useSyslogReisterMethod: false },
+			{ _id: `syslog-server-settings`, useSyslogReisterMethod: false, note: `Use experimental registration tracking from SV9500. Requires service restart, and configuration on PBX that will cause all stations to reregister.` }
 		];
 			mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`global-configuration`).insertMany(globalVariables, (err, mongoRes) => {
 				assert.equal(null, err);
-				console.log(mongoRes);
 			});
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------------  Web Interface Routes
 
 	app.get(`/login`, (req, res) => {
-		console.log(req.user);
-		res.render(`login-page`, { user: req.user });
-		});
+	//	if(req.user.hasOwnProperty(`userPermissions`)){
+		//	res.redirect(`/`);
+		//} else {
+			res.render(`login-page`, { user: req.user });
+	//	}
+	});
 
 	app.post(`/login`, tweakUsername, passport.authenticate(`local`, {
 		successReturnToOrRedirect: `/`,
@@ -208,12 +214,17 @@ mongoClient.connect(() => {
 		});
 
 	app.get(`/`, getUserPermissions, (req, res) => {
-		res.render(`home-page`, { user: req.user, userPermissions: req.userPermissions });
-		});
+		if(req.hasOwnProperty(`userPermissions`)){
+			res.render(`home-page`, { user: req.user, userPermissions: req.userPermissions });
+		} else {
+			res.render(`home-page`, { user: req.user });
+		}
+	});
+
 });
 
 getUserPermissions = (req, res, next) => {
-	if(req.user){
+	if(req.hasOwnProperty(`user`)){
 		mongoClient.get().db(process.env.MONGO_AUTH_DATABASE).collection(`user-permissions`).findOne({ _id: req.user._id }, (err, mongoRes) => {
 			req.userPermissions = mongoRes.userPermissions;
 			if(mongoRes.userPermissions[req.baseUrl.replace(/\//g,``)] || req.baseUrl == `` || req.baseUrl == `/login`){

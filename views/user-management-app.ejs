@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<%- include nav-bar %>
+<div class="row top-10-down ">
+  <div class="container-fluid col-lg-10 col-xs-12 col-lg-offset-1 bg-white box-shadow">
+			<div class="row bg-primary"><h1>User Management</h1></div>
+      <% if(typeof userPermissions == `object` && userPermissions.hasOwnProperty(`system-administration`) && userPermissions[`system-administration`]) { %>
+        <div class="row">
+            <div class="container-fluid col-lg-2 col-md-12 list-area" id="account-search-results">
+      				<% accountsArray.forEach((account) => {%>
+                <div class="result-entry"><div onclick="entrySelect('<%= account._id %>')"><%= account.username %></div></div>
+              <% }) %>
+      			</div>
+  				<div class="col margin-20">
+  					<div class="row">
+  						<label for="system-adminsitration-username">User Name</label>
+  						<input class="form-control btn-site" rows="1" type="text" id="system-adminsitration-username" data-lpignore="true"></input>
+  					</div>
+  					<div class="row margin-20">
+  						<label class="form-check-label" for="system-administration-system-administration">System Administration</label>
+  						<input class="form-check-input" type="checkbox" value="" id="system-administration-system-administration">
+  					</div>
+  					<div class="row margin-20">
+  						<label class="form-check-label" for="system-administration-directory-app">Directory App</label>
+  						<input class="form-check-input" type="checkbox" value="" id="system-administration-directory-app">
+  					</div>
+  					<div class="row margin-20">
+  						<label class="form-check-label" for="system-administration-push-notification-app">Push Notification App</label>
+  						<input class="form-check-input" type="checkbox" value="" id="system-administration-push-notification-app">
+  					</div>
+  					<div class="row margin-20">
+  						<label class="form-check-label" for="system-administration-user-management-app">User Management App</label>
+  						<input class="form-check-input" type="checkbox" value="" id="system-administration-user-management-app">
+  					</div>
+  				</div>
+  			</div>
+        <div class="row">
+          <div class="col margin-20">
+            <div id="directory-modifier-buttons">
+              <button class="btn btn-info float-right margin-10" id="system-administration-new-button">New</button>
+              <button class="btn btn-success float-right margin-10" id="system-administration-save-button">Save</button>
+              <button class="btn btn-danger float-right margin-10" id="system-administration-delete-button">Delete</button>
+              <button class="btn btn-outline-danger float-right margin-10" id="system-administration-reset-password">Reset Password</button>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+		</div>
+</div>
+
+<script src="/system-administration/js/user-managment-app.js"></script>

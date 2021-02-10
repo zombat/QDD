@@ -9,9 +9,17 @@
 			<div id="detailArea">
 					<div class="form-group">
 						<% configurationItemsArray.forEach((configItem) => { %>
+							<div class="top-10-down">
+							<% try { %>
+								<h4><%= configItem._id %></h4>
+							<% } catch { %>
+							<% } %>
+							<% try { %>
+								<p><i><%= configItem.note %></i></p>
+							<% } catch { %>
+							<% } %>
 							<% for (const [key, value] of Object.entries(configItem)) { %>
-								<% if(key == `_id`) { %>
-									<h4><%= value %></h3>
+								<% if(key == `_id` || key == `note`) { %>
 								<% } else { %>
 									<% if(typeof value == `boolean`) { %>
 										<div class="margin-20">
@@ -21,12 +29,13 @@
 										<label><%= key %></label><input class="form-control" rows="1" id="<%= key %>" value="<%=value%>"></input>
 									<% } else { %>
 										<label><%= key %></label><textarea class="form-control" rows="5" id="<%= key %>"><%=value%></textarea>
-									<% } %>								
+									<% } %>
 								<% } %>
 							<% } %>
 						<% }); %>
 					<button class="btn btn-success float-right margin-20" id="system-administration-save-button">Save</button>
 					</div>
+				</div>
 			</div>
 	</div>
 </div>
