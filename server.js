@@ -238,28 +238,20 @@ getUserPermissions = (req, res, next) => {
 	}
 }
 
-startHttpServer = () => {
+let httpsPort = 443;
+if(process.env.OVERRIDE_WEB_PORT && process.env.OVERRIDE_WEB_PORT.length){
+	httpsPort = process.env.OVERRIDE_WEB_PORT;
+}
+try{
+	https.createServer({
+		key: fs.readFileSync(`./.cert/server.key`),
+		cert: fs.readFileSync(`./.cert/server.crt`)
+	}, app).listen(443, () => {
+		console.log(`HTTPS listening on port 443`)
+	});
+} catch {
+	console.log(`Error starting https, are cert files available?`);
 	let httpPort = 80;
 	app.listen(httpPort);
 	console.log(`HTTP Server listening on port ${httpPort}`);
-}
-
-if(process.env.HTTPS == `true`){
-	let httpsPort = 443;
-	if(process.env.OVERRIDE_WEB_PORT.length){
-		httpsPort = process.env.OVERRIDE_WEB_PORT;
-	}
-	try{
-		https.createServer({
-			key: fs.readFileSync(`./.cert/server.key`),
-			cert: fs.readFileSync(`./.cert/server.crt`)
-		}, app).listen(443, () => {
-			console.log(`HTTPS listening on port 443`)
-		});
-	} catch {
-		console.log(`Error starting https, are cert files available?`);
-		startHttpServer();
-	}
-} else {
-	startHttpServer();
 }
