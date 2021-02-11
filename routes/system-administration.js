@@ -45,39 +45,47 @@ router.get(`/user-management`, (req, res) => {
 });
 
 router.patch(`/user-management`, (req, res) => {
-	if(req.body.hasOwnProperty(`_id`) && req.body._id.length){
-		let id = require(`mongodb`).ObjectID(req.body._id);
-		delete req.body._id;
-		for (const [key, value] of Object.entries(req.body.userPermissions)) {
-			if(value == `true`){
-				req.body.userPermissions[key] = true;
-			} else if(value == `false`){
-				req.body.userPermissions[key] = false;
+	if(req.body.hasOwnProperty(`userPermissions`)){
+		if(req.body.userPermissions[`system-administration`] == `true`){
+			for (var [key, value] of Object.entries(req.body.userPermissions)) {
+				value = true;
+			}
+		} else {
+			for (var [key, value] of Object.entries(req.body.userPermissions)) {
+				if(value == `true`){
+					req.body.userPermissions[key] = true;
+				} else if(value == `false`){
+					req.body.userPermissions[key] = false;
+				}
 			}
 		}
-		mongoClient.get().db(process.env.MONGO_AUTH_DATABASE).collection(`accounts`).updateOne({ _id: id}, { $set: { username: req.body.username.toLowerCase().trim() } }, (err, accountSetResponse) => {
-			assert.equal(null, err);
-			mongoClient.get().db(process.env.MONGO_AUTH_DATABASE).collection(`user-permissions`).updateOne({ _id: id}, { $set: { userPermissions: req.body.userPermissions } }, (err, accountSetResponse) => {
+		if(req.body.hasOwnProperty(`_id`) && req.body._id.length){
+			let id = require(`mongodb`).ObjectID(req.body._id);
+			delete req.body._id;
+			mongoClient.get().db(process.env.MONGO_AUTH_DATABASE).collection(`accounts`).updateOne({ _id: id}, { $set: { username: req.body.username.toLowerCase().trim() } }, (err, accountSetResponse) => {
 				assert.equal(null, err);
-				res.status(200);
-				res.json({ success: true, _id: id });
-			});
-		});
-
-	} else if(req.body.hasOwnProperty(`_id`) && !req.body._id.length) {
-		let newPassword = generatePassword(12);
-		accountModel.register(new accountModel({ username: req.body.username.toLowerCase().trim() }), newPassword, (err, user) => {
-			if(err && err.name == `UserExistsError`){
-				res.status(409);
-				res.json({ success: false });
-			} else {
-				mongoClient.get().db(process.env.MONGO_AUTH_DATABASE).collection(`user-permissions`).insertOne({ _id: user._id, userPermissions: { 'system-administration': true } }, (err, mongoRes) => {
-				assert.equal(null, err);
-				res.status(201);
-				res.json({ success: true, newUserName: req.body.username.toLowerCase().trim(), newPassword: newPassword, _id: user._id });
+				mongoClient.get().db(process.env.MONGO_AUTH_DATABASE).collection(`user-permissions`).updateOne({ _id: id}, { $set: { userPermissions: req.body.userPermissions } }, (err, accountSetResponse) => {
+					assert.equal(null, err);
+					res.status(200);
+					res.json({ success: true, _id: id });
 				});
-			}
-		});
+			});
+
+		} else if(req.body.hasOwnProperty(`_id`) && !req.body._id.length) {
+			let newPassword = generatePassword(12);
+			accountModel.register(new accountModel({ username: req.body.username.toLowerCase().trim() }), newPassword, (err, user) => {
+				if(err && err.name == `UserExistsError`){
+					res.status(409);
+					res.json({ success: false });
+				} else {
+					mongoClient.get().db(process.env.MONGO_AUTH_DATABASE).collection(`user-permissions`).insertOne({ _id: user._id, userPermissions: req.body.userPermissions }, (err, mongoRes) => {
+					assert.equal(null, err);
+					res.status(201);
+					res.json({ success: true, newUserName: req.body.username.toLowerCase().trim(), newPassword: newPassword, _id: user._id });
+					});
+				}
+			});
+		}
 	}
 });
 
