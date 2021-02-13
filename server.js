@@ -1,10 +1,13 @@
 require(`dotenv`).load();
 const	assert = require(`assert`),
+		crypto = require(`crypto`),
 		express = require(`express`),
 		request = require(`request`),
 		https = require(`https`),
 		router = express.Router(),
 		fs = require(`fs`),
+ 		zlib = require('zlib'),
+  	tar = require('tar'),
 		bodyParser = require(`body-parser`),
 		mongo = require(`mongodb`).MongoClient,
 		mongoClient = require(`./mongo-client`),
@@ -37,11 +40,11 @@ if(process.env.MONGO_CONNECT_STRING.length){
 } else {
 	var mongoUri = `mongodb://127.0.0.1`;
 }
-
+//
 // Mongoose options
 try {
 	var	ca = fs.readFileSync(__dirname + `/.cert/${process.env.ROOT_CERT_FILE_NAME}`),
-			cert = fs.readFileSync(__dirname + `/.cert/${process.env.MONGO_CERT_FILE_NAME}`),
+			// cert = fs.readFileSync(__dirname + `/.cert/${process.env.MONGO_CERT_FILE_NAME}`),
 			key = fs.readFileSync(__dirname + `/.cert/${process.env.MONGO_KEY_FILE_NAME}`)
 			mongooseOptions = {
 				ssl: true,
@@ -124,6 +127,7 @@ tweakUsername = (req, res, next) => {
 // Connect to database before serving pages.
 mongoClient.connect(() => {
 	console.log(`Connected to MongoDB`);
+
 	app.use(`/directory-app`, ensureLoggedIn, getUserPermissions, directoryAppRoute);
 	app.use(`/dtd`, dtermDirectoryAppRoute);
 	app.use(`/push-notification-app`, ensureLoggedIn, getUserPermissions, pushNotificationAppRoute);
@@ -159,8 +163,9 @@ mongoClient.connect(() => {
 				}
 			});
 		}
-	}
-	if(process.argv.indexOf(`--initDatabase`) >= 0){
+	} else if(process.argv.indexOf(`--initDatabase`) >= 0){
+		let deviceInformationDone = false;
+		let globalVariablesDone = false;
 		let deviceInformation = [
 			{ _id: `9.1.3.0`, version: `5.0.9.0`, firmwareName: `itlisips.tgz`, series: `DT710`, models: [`SIP_ITL_2E`,`SIP_ITL_6DE`] },
 			{ _id: `9.1.3.3`, version: `5.0.9.0`, firmwareName: `itlisipv.tgz`, series: `DT730`, models: [`SIP_ITL_12D`, `SIP_ITL_24D`, `SIP_ITL_32D`,`SIP_ITL_8LD`] },
@@ -178,6 +183,11 @@ mongoClient.connect(() => {
 			];
 			mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`nec-devices`).insertMany(deviceInformation, (err, mongoRes) => {
 				assert.equal(null, err);
+				deviceInformationDone = true;
+				if(deviceInformationDone && globalVariablesDone){
+					process.exit(0);
+					console.log(`Database Initialized`);
+				}
 			});
 
 		let globalVariables = [
@@ -188,7 +198,74 @@ mongoClient.connect(() => {
 		];
 			mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`global-configuration`).insertMany(globalVariables, (err, mongoRes) => {
 				assert.equal(null, err);
+				globalVariablesDone = true;
+				if(deviceInformationDone && globalVariablesDone){
+					process.exit(0);
+					console.log(`Database Initialized`);
+				}
 			});
+	} else {
+			fs.readdir(`./private/firmware`, { withFileTypes: true }, (err, files) => {
+				files.forEach((file, i) => {
+						if(file.isFile()){
+							let md5Hash = crypto.createHash('md5').update(fs.readFileSync(`./private/firmware/${file.name}`)).digest('hex');
+							mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`nec-firmware`).findOne({ md5Hash: md5Hash }, (err, mongoRes) => {
+								assert.equal(null, err);
+								if(mongoRes == null){
+									console.log(`Found new firmware file: ${file.name} (${md5Hash})`);
+									let fileContents = fs.createReadStream(`./private/firmware/${file.name}`);
+									let writeStream = fs.createWriteStream(`./private/firmware/temp/${file.name.split(`.`)[0]}.tar`);;
+									let unzip = zlib.createGunzip();
+									var extraction = fileContents.pipe(unzip).pipe(writeStream);
+									extraction.on(`finish`,() => {
+										if (!fs.existsSync(`./private/firmware/temp/${file.name.split(`.`)[0]}`)){
+											fs.mkdirSync(`./private/firmware/temp/${file.name.split(`.`)[0]}`);
+											tar.x({ C: `./private/firmware/temp/${file.name.split(`.`)[0]}`, file: `./private/firmware/temp/${file.name.split(`.`)[0]}.tar` }, () =>{
+												let updateDocument = { md5Hash: md5Hash, firmwareName: file.name };
+												let findDocument = {};
+												let directoryName =`./private/firmware/temp/${file.name.split(`.`)[0]}`
+												fs.readdir(directoryName, { withFileTypes: true }, (err, files) => {
+													files.forEach((file, i) => {
+														if(file.isFile()){
+															if(file.name.match(/fwver.txt/)){
+																let firmwareVersion = fs.readFileSync(`${directoryName}/${file.name}`).toString();
+																updateDocument.version = firmwareVersion.match(/\d*.\d*.\d*.\d*/)[0];
+															}
+															if(file.name.match(/hwver.txt/)){
+																let hardwareVersion = fs.readFileSync(`${directoryName}/${file.name}`).toString();
+																findDocument._id = hardwareVersion.match(/\d*.\d*.\d*.\d*/)[0];
+															}
+														}
+													});
+													if(!findDocument.hasOwnProperty(`_id`)){
+														switch (updateDocument.firmwareName) {
+															case `itlisips.tgz`:
+																findDocument._id = `9.1.3.0`;
+																break;
+															case `itlisipv.tgz`:
+																findDocument._id = `9.1.3.3`;
+																break;
+															case `itlisipe.tgz`:
+																findDocument._id = `9.1.3.4`;
+																break;
+															default:
+															findDocument.firmwareName = updateDocument.firmwareName;
+														}
+													}
+												mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`nec-firmware`).updateOne(findDocument, { $set: updateDocument }, { upsert: true }, (err, mongoRes) => {
+													assert.equal(null, err);
+													fs.rmdirSync(`./private/firmware/temp/${file.name.split(`.`)[0]}`, { recursive: true });
+													fs.unlink(`./private/firmware/temp/${file.name.split(`.`)[0]}.tar`, () => {});
+												});
+											});
+										});
+									}
+								});
+							}
+						});
+				}
+			});
+		});
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------------  Web Interface Routes
@@ -254,4 +331,15 @@ try{
 	let httpPort = 80;
 	app.listen(httpPort);
 	console.log(`HTTP Server listening on port ${httpPort}`);
+}
+
+displayMemoryUse = () => {
+	let used = process.memoryUsage().heapUsed / 1024 / 1024;
+	console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB`);
+	setTimeout( () => {
+		displayMemoryUse();
+	}, 2400);
+}
+if(process.argv.indexOf(`--memoryUsage`) != -1){
+	displayMemoryUse();
 }
