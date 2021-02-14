@@ -4,6 +4,7 @@ const	assert = require(`assert`),
 		express = require(`express`),
 		request = require(`request`),
 		https = require(`https`),
+		tftp = require(`tftp`),
 		router = express.Router(),
 		fs = require(`fs`),
  		zlib = require('zlib'),
@@ -124,7 +125,7 @@ tweakUsername = (req, res, next) => {
 	next();
 }
 
-// Connect to database before serving pages.
+// Connect to database
 mongoClient.connect(() => {
 	console.log(`Connected to MongoDB`);
 
@@ -135,8 +136,6 @@ mongoClient.connect(() => {
 	app.use(`/track`, dtermTrackingAppRoute.router);
 	app.use(`/system-administration`, ensureLoggedIn, getUserPermissions, systemAdministrationRoute);
 	app.use(`/user-management-app`, ensureLoggedIn, getUserPermissions, userManagementRoute);
-
-	dtermTrackingAppRoute.phoneTracker();
 
 	// Initiate administrator account
 	if(process.argv.indexOf(`--initAdminUser`) >= 0){
@@ -193,7 +192,7 @@ mongoClient.connect(() => {
 		let globalVariables = [
 			{ _id: `phone-banner-message`, bannerTitle:`Notice to All Users`, bannerText :`STOP IMMEDIATELY if you do not agree to the conditions stated in this warning. This system is for authorized use only. Users have no explicit or implicit expectation of privacy. Any or all uses of this system and all data on this system may be intercepted, monitored, recorded, copied, audited, inspected, and disclosed to authorized sites and law enforcement personnel, as well as authorized officials of other agencies. By using this system, the user consent to such disclosure at the discretion of authorized site personnel. Unauthorized or improper use of this system may result in administrative disciplinary action, civil and criminal penalties. By continuing to use this system you indicate your awareness of and consent to these terms and conditions of use.`, note: `This can be displayed on an IP phone when booting, and is used as a MOTD and a quick way to track IP phone information.`},
 			{ _id: `outside-number-prefix`, addPrefix: true, outsideAccessCode: `9`, countryCode: `1`, dialRules: `US`, note: `Define outside dialing rules. Only  US is supported at this time.`},
-			{ _id: `core-server-settings`, serverHostname: `10.4.0.150`, serverProtocol: `http`, useSyslogReisterMethod: false },
+			{ _id: `core-server-settings`, serverHostname: `10.4.0.150`, serverProtocol: `http`, useSyslogReisterMethod: false, enablePhoneUpgrade: false },
 			{ _id: `syslog-server-settings`, useSyslogReisterMethod: false, note: `Use experimental registration tracking from SV9500. Requires service restart, and configuration on PBX that will cause all stations to reregister.` }
 		];
 			mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`global-configuration`).insertMany(globalVariables, (err, mongoRes) => {
@@ -205,9 +204,10 @@ mongoClient.connect(() => {
 				}
 			});
 	} else {
+		// Parse firmware files
 			fs.readdir(`./private/firmware`, { withFileTypes: true }, (err, files) => {
 				files.forEach((file, i) => {
-						if(file.isFile()){
+						if(file.isFile() && file.name.match(/.tgz/)){
 							let md5Hash = crypto.createHash('md5').update(fs.readFileSync(`./private/firmware/${file.name}`)).digest('hex');
 							mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`nec-firmware`).findOne({ md5Hash: md5Hash }, (err, mongoRes) => {
 								assert.equal(null, err);
@@ -266,6 +266,21 @@ mongoClient.connect(() => {
 				}
 			});
 		});
+
+		// Start all required functions.
+		mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`global-configuration`).findOne({ _id: `core-server-settings` }, (err, serverSettings) => {
+			assert.equal(null, err);
+			if(process.argv.indexOf(`--memoryUsage`) != -1){
+				displayMemoryUse();
+			}
+			if(serverSettings.enablePhoneUpgrade){
+				startTftpServer(serverSettings.serverHostname);
+			}
+			if(serverSettings.useSyslogReisterMethod){
+				dtermTrackingAppRoute.phoneTracker(serverSettings.serverHostname);
+			}
+			startWebServer();
+		});
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------------  Web Interface Routes
@@ -315,24 +330,6 @@ getUserPermissions = (req, res, next) => {
 	}
 }
 
-let httpsPort = 443;
-if(process.env.OVERRIDE_WEB_PORT && process.env.OVERRIDE_WEB_PORT.length){
-	httpsPort = process.env.OVERRIDE_WEB_PORT;
-}
-try{
-	https.createServer({
-		key: fs.readFileSync(`./.cert/server.key`),
-		cert: fs.readFileSync(`./.cert/server.crt`)
-	}, app).listen(443, () => {
-		console.log(`HTTPS listening on port 443`)
-	});
-} catch {
-	console.log(`Error starting https, are cert files available?`);
-	let httpPort = 80;
-	app.listen(httpPort);
-	console.log(`HTTP Server listening on port ${httpPort}`);
-}
-
 displayMemoryUse = () => {
 	let used = process.memoryUsage().heapUsed / 1024 / 1024;
 	console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB`);
@@ -340,6 +337,44 @@ displayMemoryUse = () => {
 		displayMemoryUse();
 	}, 2400);
 }
-if(process.argv.indexOf(`--memoryUsage`) != -1){
-	displayMemoryUse();
+
+startWebServer = () => {
+	let httpsPort = 443;
+	if(process.env.OVERRIDE_WEB_PORT && process.env.OVERRIDE_WEB_PORT.length){
+		httpsPort = process.env.OVERRIDE_WEB_PORT;
+	}
+	try{
+		https.createServer({
+			key: fs.readFileSync(`./.cert/server.key`),
+			cert: fs.readFileSync(`./.cert/server.crt`)
+		}, app).listen(443, () => {
+			console.log(`HTTPS listening on port 443`)
+		});
+	} catch {
+		console.log(`Error starting https, are cert files available?`);
+		let httpPort = 80;
+		app.listen(httpPort);
+		console.log(`HTTP Server listening on port ${httpPort}`);
+	}
+}
+
+startTftpServer = (serverHostname) => {
+	var server = tftp.createServer ({
+	  host: serverHostname,
+	  port: 69,
+	  root: `./private/firmware`,
+	  denyPUT: true
+	});
+	server.listen();
+	console.log(`Starting TFTP Server on ${server.host}:${server.port}`);
+	server.on (`error`, (error) => {
+	  // Errors from the main socket. The current transfers are not aborted.
+	  console.log(error);
+	});
+	server.on (`request`, (req, res) => {
+	  req.on (`error`, (error) => {
+		// Error from the request. The connection is already closed.
+		console.log(`[${req.stats.remoteAddress}:${req.stats.remotePort}] (${req.file} - ${error.message})`);
+	  });
+	});
 }

@@ -62,6 +62,19 @@ router.get(`/cancel-nec-phone-update`, (req, res) => {
 	});
 });
 
+router.get(`/push-nec-phone-update`, (req, res) => {
+	mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`tracked-device-collection`).updateOne({ _id: req.headers[`user-agent`].split(`/`)[7] }, { $inc:  { skipFirmwareUpdateCount: 1 } }, (err, deviceDocument) => {
+		assert.equal(null, err);
+		mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`global-configuration`).findOne({ _id: `core-server-settings`}, (err, serverSettings) => {
+				assert.equal(null, err);
+				necXML.generateTextPage(`Updating`, `!!!!!!!!!!!!!!!!,\nDo not unplug any cables\nDevice will reboot when complete\n!!!!!!!!!!!!!!!!`, [], (textPage) => {
+					res.writeHead(200, { 'Content-Type': `text/html` });
+					res.end(textPage)
+				});
+		});
+	});
+});
+
 updateDtermIpAddress = (req, contextArray, callback) => {
 	// Update Dterm IP address and checks for firmware updates. Callback value of true indicates an update is available.
 	console.log(`Update Dterm IP address`);
@@ -120,57 +133,50 @@ updateDtermIpAddress = (req, contextArray, callback) => {
 	});
 }
 
-trackPhoneViaSyslog = () => {
-	// Log phones via SV9500 - I have no idea if NEC will be alright with this.
-	mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`global-configuration`).findOne( { _id: `syslog-server-settings` }, (err, syslogSettings) => {
-		assert.equal(null, err);
-		if(syslogSettings != null && syslogSettings.useSyslogReisterMethod == true){
-			server.on('listening', function () {
-				var address = server.address();
-				console.log('UDP Server listening on ' + address.address + ":" + address.port);
-			});
-
-			server.on(`message`, function (message, remote) {
-				let messageString = message.toString();
-				if(messageString.match(/SUBSCRIBE/)){
-					messageString.split(`\n`).forEach( (messageLine) =>{
-						if(messageLine.match(/contact/i)){
-							if(!messageLine.match(/sipphd/i)){
-								let contactObject = {
-									extension: messageLine.split(`@`)[0].split(`:`)[2],
-									hostAddress: messageLine.split(`@`)[1].split(`:`)[0]
-								}
-								got(`http://${messageLine.split(`@`)[1].split(`:`)[0]}/header.cgi`).then(response => {
-									var newDeviceDocument = {
-										extension: messageLine.split(`@`)[0].split(`:`)[2],
-										ipAddress: messageLine.split(`@`)[1].split(`:`)[0],
-										macAddress: response.body.match(/\w\w:\w\w:\w\w:\w\w:\w\w:\w\w/)[0],
-										hardwareVersion: response.body.match(/\d.\d.\d.\d/g)[0],
-										firmwareVersion: response.body.match(/\d.\d.\d.\d/g)[1],
-										rawHeaders: ``,
-										phoneSubModel:	``,
-										locationContexts: [],
-										lastCheckin: new Date()
-									};
-									mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`nec-devices`).findOne( { _id: response.body.match(/\d.\d.\d.\d/g)[0] }, (err, necDeviceDocument) => {
-										assert.equal(null, err);
-										if(necDeviceDocument == null){
-											necDeviceDocument = { series: `Error` };
-										}
-										newDeviceDocument.deviceSeries = necDeviceDocument.series;
-										mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`tracked-device-collection`).updateOne({ _id: newDeviceDocument.extension }, { $set:  newDeviceDocument } , { upsert: true }, (err, res) => {
-											assert.equal(null, err);
-										});
-									});
-								});
-							}
+trackPhoneViaSyslog = (serverHostname) => {
+	server.on(`listening`, function () {
+		var address = server.address();
+		console.log(`Syslog server listening on  ${address.address}:${address.port}`);
+	});
+	server.on(`message`, function (message, remote) {
+		let messageString = message.toString();
+		if(messageString.match(/SUBSCRIBE/)){
+			messageString.split(`\n`).forEach( (messageLine) =>{
+				if(messageLine.match(/contact/i)){
+					if(!messageLine.match(/sipphd/i)){
+						let contactObject = {
+							extension: messageLine.split(`@`)[0].split(`:`)[2],
+							hostAddress: messageLine.split(`@`)[1].split(`:`)[0]
 						}
-					});
+						got(`http://${messageLine.split(`@`)[1].split(`:`)[0]}/header.cgi`).then(response => {
+							var newDeviceDocument = {
+								extension: messageLine.split(`@`)[0].split(`:`)[2],
+								ipAddress: messageLine.split(`@`)[1].split(`:`)[0],
+								macAddress: response.body.match(/\w\w:\w\w:\w\w:\w\w:\w\w:\w\w/)[0],
+								hardwareVersion: response.body.match(/\d.\d.\d.\d/g)[0],
+								firmwareVersion: response.body.match(/\d.\d.\d.\d/g)[1],
+								rawHeaders: ``,
+								phoneSubModel:	``,
+								locationContexts: [],
+								lastCheckin: new Date()
+							};
+							mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`nec-devices`).findOne( { _id: response.body.match(/\d.\d.\d.\d/g)[0] }, (err, necDeviceDocument) => {
+								assert.equal(null, err);
+								if(necDeviceDocument == null){
+									necDeviceDocument = { series: `Error` };
+								}
+								newDeviceDocument.deviceSeries = necDeviceDocument.series;
+								mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`tracked-device-collection`).updateOne({ _id: newDeviceDocument.extension }, { $set:  newDeviceDocument } , { upsert: true }, (err, res) => {
+									assert.equal(null, err);
+								});
+							});
+						});
+					}
 				}
 			});
-			server.bind(514, `0.0.0.0`);
 		}
 	});
+	server.bind(514, serverHostname);
 }
 
 checkVersion = (runningVersion, availableVersion) => {
