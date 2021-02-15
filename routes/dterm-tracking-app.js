@@ -67,10 +67,9 @@ router.get(`/push-nec-phone-update`, (req, res) => {
 	var sessionID = null;
 	let hostAddress = req._remoteAddress;
 	let adminPassword = `6633222`;
-	console.log(`Session ID: ${sessionID}`);
 	mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`global-configuration`).findOne({ _id: `core-server-settings`}, (err, serverSettings) => {
 			assert.equal(null, err);
-			necXML.generateTextPage(`Updating`, `!!!!!!!!!!!!!!!!,\nDo not unplug any cables\nDevice will reboot when complete\n!!!!!!!!!!!!!!!!`, [], (textPage) => {
+			necXML.generateTextPage(`Updating`, `!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\nDo not unplug any cables\nDevice will reboot when complete\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!`, [], (textPage) => {
 				res.writeHead(200, { 'Content-Type': `text/html` });
 				res.end(textPage)
 				if (hostAddress.match(`ffff:`)){
@@ -80,55 +79,14 @@ router.get(`/push-nec-phone-update`, (req, res) => {
 					hostAddress =	`[${hostAddress}]`
 				}
 				try {
-					httpGet(`${protocolType}://${host}/index.cgi?username=ADMIN&password=${adminPassword}`, sessionID, (sessionID) => {
-						if(sessionID == null ){
-							console.log(`Session ID: ${sessionID}`);
-							httpGet(`${protocolType}://${host}/index.cgi?session=${sessionID}&set=all`, sessionID, (sessionID) => {
-								//callback(false, host, protocolType, sessionID, deviceInformation);
-							});
-						} else {
-							console.log(`Protocol Type: ${protocolType}`);
-							console.log(`Session ID: ${sessionID}`);
-							sessionID = sessionID;
-							got(`http://${hostAddress}/header.cgi`).then( (response) => {
-								console.log(`Finally`);
-								console.log(`Session ID: ${sessionID}`);
-								console.log(`Hardware Version: ${response.body.match(/\d.\d.\d.\d/g)[0]}\n`);
-								mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`global-configuration`).findOne({ _id: `core-server-settings`}, (err, serverSettings) => {
-										console.log(`Server Settings`);
-										console.log(serverSettings);
-										assert.equal(null, err);
-										mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`nec-firmware`).findOne({ _id: response.body.match(/\d.\d.\d.\d/g)[0]}, (err, phoneFirmware) => {
-										console.log(`Phone Firmware`);
-										console.log(phoneFirmware);
-											assert.equal(null, err);
-											if(phoneFirmware != null){
-												console.log(`Downloading`);
-												console.log(`Session ID: ${sessionID}`);
-												let upgradeURI = `${protocolType}://${hostAddress}/index.cgi?session=${sessionID}&download=423054e&trans=1&adr=${serverSettings.serverHostname}&type=ip&dir=&file=${phoneFirmware.firmwareName}&name=&pass=`;
-												console.log(upgradeURI + '\n');
-												got(upgradeURI).then(response => {
-													httpGet(`${protocolType}://${hostAddress}/index.cgi?session=${sessionID}&set=all`, sessionID, (sessionID) => {
-													});
-												}).catch(error => {
-													console.log(`ERROR: ${upgradeURI} - ${error.name}`);
-													httpGet(`${protocolType}://${hostAddress}/index.cgi?session=${sessionID}&set=all`, sessionID, (sessionID) => {
-													});
-												});
-											} else {
-												mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`tracked-device-collection`).updateOne({ _id: req.headers[`user-agent`].split(`/`)[7] }, { $set: { skipFirmwareUpdateCount: 999 } }, (err, deviceDocument) => {
-													assert.equal(null, err);
-													httpGet(`${protocolType}://${hostAddress}/index.cgi?session=${sessionID}&set=all`, sessionID, (sessionID) => {
-													});
-												});
-											}
-										});
-									});
-								});
-						}
+					logonDtermIP(protocolType, hostAddress, adminPassword, sessionID, req.headers[`user-agent`].split(`/`)[7], (returnedSessionID) => {
+						sessionID = returnedSessionID;
 					});
 				} catch {
+
+					/*
 					protocolType = `http`;
+					console.log(`Failing to HTTP`);
 					httpGet(`${protocolType}://${hostAddress}/index.cgi?username=ADMIN&password=${adminPassword}`, sessionID, (sessionID) => {
 						if(sessionID == null ){
 							console.log(`Session ID: ${sessionID}`);
@@ -162,11 +120,47 @@ router.get(`/push-nec-phone-update`, (req, res) => {
 							});
 						}
 					});
+					*/
 				}
 			});
 		});
 	});
 
+//	logonDtermIP(protocolType, hostAddress, adminPassword, sessionID, (returnedSessionID) => {
+
+logonDtermIP = (protocolType, hostAddress, adminPassword, sessionID, extension, callback) => {
+	console.log(`Attempting to connect to ${hostAddress} via ${protocolType}`);
+	httpGet(protocolType, `://${hostAddress}/index.cgi?username=ADMIN&password=${adminPassword}`, sessionID, (sessionID, protocolType) => {
+		if(sessionID == null ){
+		} else {
+			sessionID = sessionID;
+			got(`${protocolType}://${hostAddress}/header.cgi`).then( (response) => {
+				mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`global-configuration`).findOne({ _id: `core-server-settings`}, (err, serverSettings) => {
+						assert.equal(null, err);
+						mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`nec-firmware`).findOne({ _id: response.body.match(/\d.\d.\d.\d/g)[0]}, (err, phoneFirmware) => {
+							assert.equal(null, err);
+							if(phoneFirmware != null){
+								let upgradeURI = `${protocolType}://${hostAddress}/index.cgi?session=${sessionID}&download=423054e&trans=1&adr=${serverSettings.serverHostname}&type=ip&dir=&file=${phoneFirmware.firmwareName}&name=&pass=`;
+								got(upgradeURI).then(response => {
+									httpGet(protocolType, `://${hostAddress}/index.cgi?session=${sessionID}&set=all`, sessionID, (sessionID, protocolType) => {
+									});
+								}).catch(error => {
+									httpGet(protocolType, `://${hostAddress}/index.cgi?session=${sessionID}&set=all`, sessionID, (sessionID, protocolType) => {
+									});
+								});
+							} else {
+								mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`tracked-device-collection`).updateOne({ _id: extension }, { $set: { skipFirmwareUpdateCount: 999 } }, (err, deviceDocument) => {
+									assert.equal(null, err);
+									httpGet(protocolType, `://${hostAddress}/index.cgi?session=${sessionID}&set=all`, sessionID, (sessionID, protocolType) => {
+									});
+								});
+							}
+						});
+					});
+				});
+		}
+	});
+}
 
 updateDtermIpAddress = (req, contextArray, callback) => {
 	// Update Dterm IP address and checks for firmware updates. Callback value of true indicates an update is available.
@@ -285,23 +279,60 @@ checkVersion = (runningVersion, availableVersion) => {
 	return(returnValue);
 }
 
-httpGet = (uri, sessionID, callback) => {
+httpGet = (protocolType, uri, sessionID, callback) => {
 	// Handle HTTP Get requests.
-	got(uri).then(response => {
+	got(protocolType + uri).then(response => {
 		if(response.body.match(/Terminal is busy/)){
-			callback(null);
+			callback(null, protocolType);
 		} else {
 			if(sessionID == null){
 				callback(response.body.match(/session=(\w*)/)[1]);
 			} else {
 				console.log(`Session ID: ${sessionID}`);
-
-				callback(sessionID);
+				callback(sessionID, protocolType);
 			}
 		}
 	}).catch(error => {
-		console.log(`Error: ${uri} - ${error.name}`);
-		callback(null);
+		if(protocolType.match(`https`)){
+			console.log(`TLS Error - Attempting to connect to without certificate verification`);
+			if (process.env.NODE_TLS_REJECT_UNAUTHORIZED == 1){
+					process.env.NODE_TLS_REJECT_UNAUTHORIZED = 0;
+			}
+			got(protocolType + uri).then(response => {
+				if(response.body.match(/Terminal is busy/)){
+					callback(null, protocolType);
+				} else {
+					if(sessionID == null){
+						callback(response.body.match(/session=(\w*)/)[1], protocolType);
+					} else {
+						console.log(`Session ID: ${sessionID}`);
+						callback(response.body.match(/session=(\w*)/)[1], protocolType);
+					}
+				}
+			}).catch(error => {
+				process.env.NODE_TLS_REJECT_UNAUTHORIZED = 1;
+				console.log(`Https failure - Attempting UNSECURE http as last resort`);
+				protocolType = `http`;
+				got(protocolType + uri).then(response => {
+					if(response.body.match(/Terminal is busy/)){
+						callback(null, protocolType);
+					} else {
+						if(sessionID == null){
+							callback(response.body.match(/session=(\w*)/)[1], protocolType);
+						} else {
+							console.log(`Session ID: ${sessionID}`);
+							callback(response.body.match(/session=(\w*)/)[1], protocolType);
+						}
+					}
+				}).catch(error => {
+					console.log(`Error: ${protocolType}${uri} - ${error.name}`);
+					callback(null, protocolType);
+				});
+			});
+		} else {
+			console.log(`Error: ${protocolType}${uri} - ${error.name}`);
+			callback(null, protocolType);
+		}
 	});
 }
 
