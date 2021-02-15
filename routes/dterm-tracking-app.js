@@ -63,17 +63,110 @@ router.get(`/cancel-nec-phone-update`, (req, res) => {
 });
 
 router.get(`/push-nec-phone-update`, (req, res) => {
-	mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`tracked-device-collection`).updateOne({ _id: req.headers[`user-agent`].split(`/`)[7] }, { $inc:  { skipFirmwareUpdateCount: 1 } }, (err, deviceDocument) => {
-		assert.equal(null, err);
-		mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`global-configuration`).findOne({ _id: `core-server-settings`}, (err, serverSettings) => {
-				assert.equal(null, err);
-				necXML.generateTextPage(`Updating`, `!!!!!!!!!!!!!!!!,\nDo not unplug any cables\nDevice will reboot when complete\n!!!!!!!!!!!!!!!!`, [], (textPage) => {
-					res.writeHead(200, { 'Content-Type': `text/html` });
-					res.end(textPage)
-				});
+	let protocolType = `https`;
+	var sessionID = null;
+	let hostAddress = req._remoteAddress;
+	let adminPassword = `6633222`;
+	console.log(`Session ID: ${sessionID}`);
+	mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`global-configuration`).findOne({ _id: `core-server-settings`}, (err, serverSettings) => {
+			assert.equal(null, err);
+			necXML.generateTextPage(`Updating`, `!!!!!!!!!!!!!!!!,\nDo not unplug any cables\nDevice will reboot when complete\n!!!!!!!!!!!!!!!!`, [], (textPage) => {
+				res.writeHead(200, { 'Content-Type': `text/html` });
+				res.end(textPage)
+				if (hostAddress.match(`ffff:`)){
+					hostAddress = req._remoteAddress.split(`ffff:`)[1];
+				}
+				if(hostAddress.match(`:`)){
+					hostAddress =	`[${hostAddress}]`
+				}
+				try {
+					httpGet(`${protocolType}://${host}/index.cgi?username=ADMIN&password=${adminPassword}`, sessionID, (sessionID) => {
+						if(sessionID == null ){
+							console.log(`Session ID: ${sessionID}`);
+							httpGet(`${protocolType}://${host}/index.cgi?session=${sessionID}&set=all`, sessionID, (sessionID) => {
+								//callback(false, host, protocolType, sessionID, deviceInformation);
+							});
+						} else {
+							console.log(`Protocol Type: ${protocolType}`);
+							console.log(`Session ID: ${sessionID}`);
+							sessionID = sessionID;
+							got(`http://${hostAddress}/header.cgi`).then( (response) => {
+								console.log(`Finally`);
+								console.log(`Session ID: ${sessionID}`);
+								console.log(`Hardware Version: ${response.body.match(/\d.\d.\d.\d/g)[0]}\n`);
+								mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`global-configuration`).findOne({ _id: `core-server-settings`}, (err, serverSettings) => {
+										console.log(`Server Settings`);
+										console.log(serverSettings);
+										assert.equal(null, err);
+										mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`nec-firmware`).findOne({ _id: response.body.match(/\d.\d.\d.\d/g)[0]}, (err, phoneFirmware) => {
+										console.log(`Phone Firmware`);
+										console.log(phoneFirmware);
+											assert.equal(null, err);
+											if(phoneFirmware != null){
+												console.log(`Downloading`);
+												console.log(`Session ID: ${sessionID}`);
+												let upgradeURI = `${protocolType}://${hostAddress}/index.cgi?session=${sessionID}&download=423054e&trans=1&adr=${serverSettings.serverHostname}&type=ip&dir=&file=${phoneFirmware.firmwareName}&name=&pass=`;
+												console.log(upgradeURI + '\n');
+												got(upgradeURI).then(response => {
+													httpGet(`${protocolType}://${hostAddress}/index.cgi?session=${sessionID}&set=all`, sessionID, (sessionID) => {
+													});
+												}).catch(error => {
+													console.log(`ERROR: ${upgradeURI} - ${error.name}`);
+													httpGet(`${protocolType}://${hostAddress}/index.cgi?session=${sessionID}&set=all`, sessionID, (sessionID) => {
+													});
+												});
+											} else {
+												mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`tracked-device-collection`).updateOne({ _id: req.headers[`user-agent`].split(`/`)[7] }, { $set: { skipFirmwareUpdateCount: 999 } }, (err, deviceDocument) => {
+													assert.equal(null, err);
+													httpGet(`${protocolType}://${hostAddress}/index.cgi?session=${sessionID}&set=all`, sessionID, (sessionID) => {
+													});
+												});
+											}
+										});
+									});
+								});
+						}
+					});
+				} catch {
+					protocolType = `http`;
+					httpGet(`${protocolType}://${hostAddress}/index.cgi?username=ADMIN&password=${adminPassword}`, sessionID, (sessionID) => {
+						if(sessionID == null ){
+							console.log(`Session ID: ${sessionID}`);
+							httpGet(`${protocolType}://${hostAddress}/index.cgi?session=${sessionID}&set=all`, sessionID, (sessionID) => {
+							});
+						} else {
+							sessionID = sessionID;
+							got(`http://${hostAddress}/header.cgi`).then( (response) => {
+								mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`global-configuration`).findOne({ _id: `core-server-settings`}, (err, serverSettings) => {
+										assert.equal(null, err);
+										mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`nec-firmware`).findOne({ _id: response.body.match(/\d.\d.\d.\d/g)[0]}, (err, phoneFirmware) => {
+											assert.equal(null, err);
+											if(phoneFirmware != null){
+												let upgradeURI = `${protocolType}://${hostAddress}/index.cgi?session=${sessionID}&download=423054e&trans=1&adr=${serverSettings.serverHostname}&type=ip&dir=&file=${phoneFirmware.firmwareName}&name=&pass=`;
+												got(upgradeURI).then(response => {
+													httpGet(`${protocolType}://${hostAddress}/index.cgi?session=${sessionID}&set=all`, sessionID, (sessionID) => {
+													});
+												}).catch(error => {
+													httpGet(`${protocolType}://${hostAddress}/index.cgi?session=${sessionID}&set=all`, sessionID, (sessionID) => {
+													});
+												});
+											} else {
+												mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`tracked-device-collection`).updateOne({ _id: req.headers[`user-agent`].split(`/`)[7] }, { $set: { skipFirmwareUpdateCount: 999 } }, (err, deviceDocument) => {
+													assert.equal(null, err);
+													httpGet(`${protocolType}://${hostAddress}/index.cgi?session=${sessionID}&set=all`, sessionID, (sessionID) => {
+													});
+												});
+											}
+										});
+									});
+							});
+						}
+					});
+				}
+			});
 		});
 	});
-});
+
 
 updateDtermIpAddress = (req, contextArray, callback) => {
 	// Update Dterm IP address and checks for firmware updates. Callback value of true indicates an update is available.
@@ -192,9 +285,29 @@ checkVersion = (runningVersion, availableVersion) => {
 	return(returnValue);
 }
 
+httpGet = (uri, sessionID, callback) => {
+	// Handle HTTP Get requests.
+	got(uri).then(response => {
+		if(response.body.match(/Terminal is busy/)){
+			callback(null);
+		} else {
+			if(sessionID == null){
+				callback(response.body.match(/session=(\w*)/)[1]);
+			} else {
+				console.log(`Session ID: ${sessionID}`);
+
+				callback(sessionID);
+			}
+		}
+	}).catch(error => {
+		console.log(`Error: ${uri} - ${error.name}`);
+		callback(null);
+	});
+}
+
 module.exports = {
     router: router,
-	phoneTracker: trackPhoneViaSyslog
+		phoneTracker: trackPhoneViaSyslog
 };
 
 //module.exports = router;
