@@ -24,7 +24,6 @@ const	assert = require(`assert`),
 			ensureLoggedIn = require(`connect-ensure-login`).ensureLoggedIn(),
 			unexpectedResponse = `<DtermIPText title='Search Results'>\n<Text>Unexpected response</Text>\n<SoftKeyItem index='1' name='Back'><URI>SoftKey:Back</URI></SoftKeyItem></DtermIPText>`,
 			{ v4: uuidv4 } = require(`uuid`);
-
 // Routes
 const	directoryAppRoute = require(`./routes/directory-app`),
 			dtermDirectoryAppRoute = require(`./routes/dterm-directory-app`),
@@ -33,7 +32,6 @@ const	directoryAppRoute = require(`./routes/directory-app`),
 			dtermTrackingAppRoute= require(`./routes/dterm-tracking-app`),
 			systemAdministrationRoute= require(`./routes/system-administration`),
 			userManagementRoute= require(`./routes/user-management-app`);
-
 // MongoDB Connection URI
 if(process.env.MONGO_USER.length && process.env.MONGO_PASSWORD){
 	var mongoUri = `mongodb://${encodeURIComponent(process.env.MONGO_USER)}:${encodeURIComponent(process.env.MONGO_PASSWORD)}@`;
@@ -194,7 +192,7 @@ tweakUsername = (req, res, next) => {
 			let globalVariables = [
 				{ _id: `phone-banner-message`, bannerTitle:`Notice to All Users`, bannerText :`STOP IMMEDIATELY if you do not agree to the conditions stated in this warning. This system is for authorized use only. Users have no explicit or implicit expectation of privacy. Any or all uses of this system and all data on this system may be intercepted, monitored, recorded, copied, audited, inspected, and disclosed to authorized sites and law enforcement personnel, as well as authorized officials of other agencies. By using this system, the user consent to such disclosure at the discretion of authorized site personnel. Unauthorized or improper use of this system may result in administrative disciplinary action, civil and criminal penalties. By continuing to use this system you indicate your awareness of and consent to these terms and conditions of use.`, note: `This can be displayed on an IP phone when booting, and is used as a MOTD and a quick way to track IP phone information.`},
 				{ _id: `outside-number-prefix`, addPrefix: true, outsideAccessCode: `9`, countryCode: `1`, dialRules: `US`, note: `Define outside dialing rules. Only  US is supported at this time.`},
-				{ _id: `core-server-settings`, serverHostname: `10.4.0.150`, serverProtocol: `http`, useSyslogReisterMethod: false, enablePhoneUpgrade: false },
+				{ _id: `core-server-settings`, serverHostname: `10.4.0.150`, serverProtocol: `http`, useSyslogReisterMethod: false, enablePhoneUpgrade: false, enableClustering: true },
 				{ _id: `syslog-server-settings`, useSyslogReisterMethod: false, note: `Use experimental registration tracking from SV9500. Requires service restart, and configuration on PBX that will cause all stations to reregister.` }
 			];
 				mongoClient.get().db(process.env.SYSTEM_VARIABLES_DATABASE).collection(`global-configuration`).insertMany(globalVariables, (err, mongoRes) => {
@@ -275,12 +273,11 @@ tweakUsername = (req, res, next) => {
 					if(serverSettings.enableClustering){
 						if (cluster.isMaster) {
 							console.log(`Primary Thread (${process.pid}) is running`);
-
+							startTftpServer(serverSettings.serverHostname);
 							// Fork workers.
 							for (let i = 0; i < numCPUs; i++) {
 								cluster.fork();
 							}
-
 							cluster.on('exit', (worker, code, signal) => {
 								console.log(`worker ${worker.process.pid} died`);
 							});
@@ -289,6 +286,7 @@ tweakUsername = (req, res, next) => {
 						}
 					} else {
 						startServices(serverSettings);
+						startTftpServer(serverSettings.serverHostname);
 					}
 				});
 		}
@@ -374,19 +372,20 @@ startWebServer = () => {
 }
 
 startTftpServer = (serverHostname) => {
-	var server = tftp.createServer ({
-	  host: serverHostname,
-	  port: 69,
-	  root: `./private/firmware`,
-	  denyPUT: true
+	var tftpServer = tftp.createServer ({
+		host: serverHostname,
+		port: 69,
+		root: `./private/firmware`,
+		denyPUT: true
 	});
-	server.listen();
-	console.log(`Starting TFTP Server on ${server.host}:${server.port}`);
-	server.on (`error`, (error) => {
+	tftpServer.listen();
+
+	console.log(`Starting TFTP Server on ${tftpServer.host}:${tftpServer.port}`);
+	tftpServer.on (`error`, (error) => {
 	  // Errors from the main socket. The current transfers are not aborted.
 	  console.log(error);
 	});
-	server.on (`request`, (req, res) => {
+	tftpServer.on (`request`, (req, res) => {
 	  req.on (`error`, (error) => {
 		// Error from the request. The connection is already closed.
 		console.log(`[${req.stats.remoteAddress}:${req.stats.remotePort}] (${req.file} - ${error.message})`);
@@ -394,12 +393,13 @@ startTftpServer = (serverHostname) => {
 	});
 }
 
+
 startServices = (serverSettings) => {
 	if(process.argv.indexOf(`--memoryUsage`) != -1){
 		displayMemoryUse();
 	}
 	if(serverSettings.enablePhoneUpgrade){
-		startTftpServer(serverSettings.serverHostname);
+
 	}
 	if(serverSettings.useSyslogReisterMethod){
 		dtermTrackingAppRoute.phoneTracker(serverSettings.serverHostname);
